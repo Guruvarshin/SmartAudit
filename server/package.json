@@ -1,0 +1,17 @@
+{
+  "name": "smartaudit-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "seed": "node src/seed/index.js",
+    "start:server": "node src/server.js",
+    "start:worker": "node src/worker/index.js",
+    "migrate:models": "node src/scripts/migrateModels.js",
+    "test": "node --test test/**/*.test.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "mongoose": "^8.9.5"
+  }
+}

@@ -1,0 +1,21 @@
+node_modules/
+.env
+.env.local
+dist/
+build/
+coverage/
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Assessment scaffolding and agent workflow files.
+# Kept on disk (the build process reads them) but not part of the deliverable.
+CLAUDE.md
+SPEC.md
+DAY_PLAN.md
+STRATEGY.md
+PROMPT_SEQUENCE.md
+*.pdf

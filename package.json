@@ -1,0 +1,19 @@
+{
+  "name": "smartaudit",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SmartAudit — Intelligent Financial Audit Pipeline (MERN)",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "setup": "npm install && npm --prefix server install",
+    "seed": "npm --prefix server run seed --",
+    "start:server": "npm --prefix server run start:server",
+    "start:worker": "npm --prefix server run start:worker",
+    "start:client": "npm --prefix client run dev",
+    "migrate:models": "npm --prefix server run migrate:models --",
+    "test": "npm --prefix server test"
+  }
+}
