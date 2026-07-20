@@ -1,0 +1,121 @@
+import { Entry } from '../models/Entry.js';
+import { EntryVectors } from '../models/EntryVectors.js';
+import { EntryFactory } from './EntryFactory.js';
+import { COMPANIES } from './LedgerReferenceData.js';
+
+const INSERT_CHUNK_SIZE = 250;
+
+/**
+ * Orchestrates database seeding: clears prior seed data, rebuilds indexes,
+ * inserts a generated ledger, and reports what was planted.
+ *
+ * The report is not decoration. The whole purpose of the seed is to give the
+ * enrichment pipeline real signal to find, so the run prints exactly what
+ * signal it planted — that number is what Day 2's detection output gets
+ * compared against.
+ */
+export class SeedRunner {
+  constructor({ count, seed, logger = console }) {
+    this.count = count;
+    this.seed = seed;
+    this.logger = logger;
+  }
+
+  async run() {
+    this.logger.log(`[seed] generating ${this.count} entries (random seed ${this.seed})`);
+
+    await this.#resetCollections();
+    await this.#syncIndexes();
+
+    const factory = new EntryFactory({ seed: this.seed, count: this.count });
+    const { documents, tags } = factory.build();
+
+    await this.#insert(documents);
+    await this.#report(documents, tags);
+
+    return { inserted: documents.length };
+  }
+
+  /**
+   * Drops both collections so that re-running the seed is idempotent — the
+   * reviewer will run this more than once, and appending would break the
+   * per-company unique index on entryNo.
+   */
+  async #resetCollections() {
+    for (const model of [Entry, EntryVectors]) {
+      try {
+        await model.collection.drop();
+        this.logger.log(`[seed] dropped ${model.collection.collectionName}`);
+      } catch (error) {
+        // 26 = NamespaceNotFound: nothing to drop on a first run.
+        if (error.code !== 26) throw error;
+      }
+    }
+  }
+
+  async #syncIndexes() {
+    // Indexes are built before insertion so the unique constraint on
+    // (companyId, entryNo) actually validates the generated data rather than
+    // being applied to it after the fact.
+    await Entry.syncIndexes();
+    await EntryVectors.syncIndexes();
+    this.logger.log('[seed] indexes synced');
+  }
+
+  async #insert(documents) {
+    for (let i = 0; i < documents.length; i += INSERT_CHUNK_SIZE) {
+      const chunk = documents.slice(i, i + INSERT_CHUNK_SIZE);
+      // `timestamps: false` preserves the historical `created`/`updated` values
+      // built by the factory; without it Mongoose would stamp every record with
+      // the current time and the ledger would have no history.
+      await Entry.insertMany(chunk, { ordered: true, timestamps: false });
+    }
+    this.logger.log(`[seed] inserted ${documents.length} entries`);
+  }
+
+  async #report(documents, tags) {
+    const cohortCounts = new Map();
+    for (const tagList of tags) {
+      for (const tag of tagList) {
+        cohortCounts.set(tag, (cohortCounts.get(tag) ?? 0) + 1);
+      }
+    }
+
+    const entryCount = await Entry.countDocuments();
+    const vectorCount = await EntryVectors.countDocuments();
+    const pendingCount = await Entry.countDocuments({
+      'analytics.enrichment.status': 'pending'
+    });
+
+    const dates = documents.map((d) => d.postingDate.getTime());
+    const oldest = new Date(Math.min(...dates)).toISOString().slice(0, 10);
+    const newest = new Date(Math.max(...dates)).toISOString().slice(0, 10);
+
+    this.logger.log('');
+    this.logger.log('  Planted cohorts');
+    this.logger.log('  ' + '-'.repeat(46));
+    const sorted = [...cohortCounts.entries()].sort((a, b) => b[1] - a[1]);
+    for (const [cohort, count] of sorted) {
+      const pct = ((count / documents.length) * 100).toFixed(1).padStart(5);
+      this.logger.log(`  ${cohort.padEnd(20)} ${String(count).padStart(5)}   ${pct}%`);
+    }
+    this.logger.log('  ' + '-'.repeat(46));
+    this.logger.log(
+      '  (tags overlap: some entries are both unbalanced and off-hours, so risk',
+    );
+    this.logger.log('   scoring has to combine factors rather than branch on one)');
+    this.logger.log('');
+
+    this.logger.log('  Ledger');
+    this.logger.log('  ' + '-'.repeat(46));
+    this.logger.log(`  entries in database        ${entryCount}`);
+    this.logger.log(`  awaiting enrichment        ${pendingCount}`);
+    this.logger.log(`  vector documents           ${vectorCount}  (expected 0 until the worker runs)`);
+    this.logger.log(`  posting date range         ${oldest} .. ${newest}`);
+    for (const company of COMPANIES) {
+      const n = await Entry.countDocuments({ companyId: company._id });
+      this.logger.log(`  ${company.name.padEnd(34)} ${n}`);
+    }
+    this.logger.log('');
+  }
+}
