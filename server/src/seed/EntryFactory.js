@@ -36,6 +36,8 @@ export class EntryFactory {
     this.rng = new SeededRandom(seed);
     this.count = count;
     this.entryCounters = new Map();
+    this.objectIdCounter = 0;
+    this.seedHex = (seed >>> 0).toString(16).padStart(8, '0').slice(-8);
   }
 
   /**
@@ -191,7 +193,7 @@ export class EntryFactory {
     const uploadNo = this.rng.int(1, 30);
 
     return {
-      _id: new mongoose.Types.ObjectId(),
+      _id: this.#nextObjectId(),
       postingDate,
       transactionType: 'Journal Entry',
       entryNo: this.#nextEntryNo(company._id),
@@ -306,6 +308,23 @@ export class EntryFactory {
 
   #pickCompany() {
     return this.rng.bool(COMPANIES[0].weight) ? COMPANIES[0] : COMPANIES[1];
+  }
+
+  /**
+   * Derives the document id from the seed and a counter rather than letting
+   * Mongo generate one.
+   *
+   * Without this, re-seeding produces byte-identical *content* under new ids,
+   * so anything that references an entry by id — a README curl example for
+   * POST /api/entries/search/similar, which takes an entry id as its input, or
+   * a saved request collection — silently breaks the moment the reviewer
+   * re-runs the seed. Deriving the id from the seed makes `npm run seed`
+   * reproducible in identity as well as in content.
+   */
+  #nextObjectId() {
+    this.objectIdCounter += 1;
+    const suffix = this.objectIdCounter.toString(16).padStart(8, '0').slice(-8);
+    return new mongoose.Types.ObjectId(`${this.seedHex}00000000${suffix}`);
   }
 
   /** Entry numbers are unique within a company, so they are counted per tenant. */
