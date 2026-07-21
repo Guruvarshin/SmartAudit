@@ -243,3 +243,96 @@ An independent verification agent (fresh `SPEC.md` read, no session context) ran
 Also confirmed by the verifier, already known and scheduled: `npm run start:client` fails (no `client/` yet) and `README.md` does not exist — both are Day 4 deliverables; and the machine's unrelated `decideiq` container occupies port 3000, which will collide with `CLIENT_PORT=3000` on Day 4 (plan to stop it or change the port).
 
 **Affects:** `.env` (local only), Day 4 demo script.
+
+---
+
+## [Day 4] Client stack: Vite + React class components, Bootstrap as CSS only, dev-proxy instead of CORS
+
+**Decision:** `client/` is a Vite + React 18 app in plain JS. Every component from `<App/>` down is a `React.Component` class — including small presentational pieces (`TierBadge`, `StaleBadge`, `VectorBars`). `main.jsx` holds the single non-class line in the codebase, the `createRoot(...).render(<App/>)` call, which has no component form. Bootstrap 5 is consumed as **CSS only**; `react-bootstrap` is deliberately not a dependency. Vite proxies `/api` to `VITE_API_BASE_URL`, so the browser is always same-origin with the dev server and the Express app needed no CORS middleware.
+
+**Alternatives considered:** `react-bootstrap` for the modal/table widgets (rejected: its components are internally function components using hooks — importing them would put hooks in the rendered tree, which is the exact thing `SPEC.md` §4 and `CLAUDE.md` constraint #2 prohibit; the constraint is about the UI being written with class components, and shipping a hook-based component library through the back door reads as evasion); Create React App (unmaintained, and `.env.example` already documented `VITE_API_BASE_URL`, fixing the intent); adding the `cors` package server-side (a second way to reach the API, and a production-shaped concern solved for a local dev convenience — the proxy is strictly narrower).
+
+**Cost accepted:** hand-rolling modal markup and dropdown behaviour against Bootstrap's CSS classes. Small: the modal is `this.state`-controlled markup with a backdrop click and an Escape listener, which is less code than wiring Bootstrap's JS would have been.
+
+**Affects:** `client/**`, `vite.config.js`, `.env.example` (comment clarifying `VITE_API_BASE_URL` is the proxy target), root `package.json` (`setup` now installs `client/` too).
+
+---
+
+## [Day 4] Additive `GET /api/entries/:id/vectors`, in its own service to preserve the Day 1 import boundary
+
+**Decision:** a read-only route returning `{ entryId, modelVersion, stale, sourceHash, dims, spaces: { semantic|financial|entity: { values, norm } } }`, 400 on a bad id, 404 for an unknown entry, **409 while the entry is unenriched** (mirroring the similarity endpoint's contract rather than inventing a second one). It lives in a new `VectorDiagnosticsService`, **not** on `EntryService`.
+
+**Why a separate class:** `EntryService` owns the `PUT` path, and Day 1 established that Scenario D's execution path must hold no handle to the vectors collection. Hanging this read on `EntryService` would have put an `EntryVectorsRepository` in scope of the update path — degrading a structural guarantee back into a behavioural one for no benefit. A separate service keeps `EntryService`'s imports vector-free, which is the property that makes "Scenario D cannot touch vectors" checkable by reading the import list.
+
+**Why it exists at all:** the spec requires a "deep-dive multi-vector diagnostics modal", and Day 1 named exactly two consumers for `entry_vectors` — the similarity endpoint and the diagnostics modal. Only the first had a route. Same additive-GET precedent as Day 2's user-confirmed list/detail GETs. Confirmed with the user at Day 4 plan approval.
+
+**Affects:** `server/src/services/VectorDiagnosticsService.js`, `EntryController.getVectors`, `EntryRouter` (mounted before `/:id` alongside `search/similar`), `App.js` wiring.
+
+---
+
+## [Day 4] UI async model: the entry list *is* the queue view; adaptive `setTimeout` chain, not `setInterval`
+
+**Decision:** no polling of a job API, because Day 2 decided there is no job API — `analytics.enrichment.status` on the entry document is the queue state, so re-fetching entries *is* reading the queue. `AuditDashboard` runs a `setTimeout` chain started in `componentDidMount` and cleared in `componentWillUnmount`, re-armed after every fetch completes: **2 s** while any listed entry is `pending`/`processing`, **10 s** when everything is settled. An in-flight flag drops overlapping fetches; an `unmounted` flag drops late responses. The open `DiagnosticsModal` polls its single entry on the same rule and refetches vectors on a `pending → complete` transition. After a `PUT`, the UI reads `routing.scenario` from the response to decide whether to expect worker activity at all (B/D yes, E/`no_op` no) — honouring the Day 3 note that the dashboard should read the routing block rather than re-derive the classification client-side.
+
+**Alternatives considered:** `setInterval` (a response slower than the interval stacks requests — the failure mode gets worse exactly when the server is under load); a fixed 1 s poll (wasteful on a settled 500-row ledger, and the spec's own concern is scaling behaviour); WebSockets/SSE (a real answer at scale, but it needs a second transport and a push path out of the worker, and Day 2 deliberately avoided change streams to stay correct on standalone `mongod` — the same reasoning applies).
+
+**Bug found and fixed during live verification (worth recording because it is a class of mistake, not a typo):** the first implementation scheduled the next poll from `this.state`, which `setState` had not yet committed — so after a save that queued a recompute, the component read the *pre-save* entry, concluded nothing was in flight, and never started the fast poll. The banner sat on "recomputing…" indefinitely even though the worker had finished in ~400 ms. Fixed by passing the freshly-fetched entry explicitly into the scheduling function rather than reading component state. Both `AuditDashboard.refresh` and `DiagnosticsModal.#refreshEntry` now do this. Verified live afterwards: the banner transitions to "Recompute finished — analytics below are fresh."
+
+**Affects:** `client/src/components/AuditDashboard.jsx`, `client/src/components/DiagnosticsModal.jsx`, `client/src/domain/constants.js` (`POLL_ACTIVE_MS`, `POLL_IDLE_MS`, `isInFlight`).
+
+---
+
+## [Day 4] Save guard: three UI behaviours, each mirroring a backend guarantee rather than substituting for one
+
+**Decision:**
+
+1. **Disable-while-saving** — `this.state.saving` gates the submit handler and disables the button. This is the spec's "sequential double-clicks on save actions" case.
+2. **Dirty-fields-only PUT** — the form diffs its draft against the entry snapshot and sends only changed keys; save is disabled when nothing is dirty.
+3. **409 means reload, never blind retry** — on a CAS conflict the form refetches the entry, resets to server truth, and tells the auditor to re-apply. The UI never re-submits a write the server just refused.
+
+**Why framed as mirroring:** the correctness here is already backend-side — diff-based classification makes an identical re-send a `no_op`, queue coalescing collapses N re-enqueues into one recompute, and the optimistic CAS on `updated` is what actually prevents a lost update. The UI layer is defence in depth and UX, and is deliberately documented that way in the code comments so a reviewer does not read it as *the* mitigation. Sending only dirty fields additionally keeps `routing.changedFields` meaningful instead of listing every field on the form.
+
+**Verified (user-required this be demonstrated, not merely described):**
+
+- *Double-click:* two identical PUTs → `routing.scenario: "B"` then `"no_op"`; the second wrote nothing and queued nothing.
+- *Contention:* parallel writer loops against one entry recorded 386 responses, **14 of them 409**; the entry settled `complete` at `attempts: 1` with no lost update or stranded job.
+- *Two-tab concurrent edit:* two tabs open on the same entry; tab B saved `glNumber`, then tab A — two writes stale — saved `description`. Accepted with correct `B` routing and the form re-synchronised to the server's merged state (disjoint fields, and each PUT re-plans from a fresh read; the single internal CAS retry absorbs exactly this case).
+- *409 UI branch:* exercised by injecting a 409 into one save, since reproducing a natural CAS miss against a specific browser click is timing-dependent. Form showed the reload notice and reset to server values. **Recorded honestly in `README.md` as an injected response, not a natural one.**
+
+**Affects:** `client/src/components/panels/EditEntryForm.jsx`, `AuditMetaPanel.jsx`, `NewEntryForm.jsx`, `client/src/api/ApiClient.js` (`ApiError` carries `status` so components branch on 409 without string-matching).
+
+---
+
+## [Day 4] Demo media: three screenshots, with the worker log committed verbatim beside its rendering
+
+**Decision:** screenshots rather than a video (user-chosen at plan approval; the spec accepts either). Captured against the real running stack with a headless-Chrome script driving the actual client: (1) dashboard with risk colour-coding and a genuinely `pending` entry mid-enrichment, (2) the diagnostics modal for the spec's canonical high-risk shape — unbalanced, 02:00 weekend, evasive narrative, amount just under the approval threshold — scoring 1.00/high with all four factors, four IFRS flags, four anomaly signals, all three vector spaces and a live entity-strategy similarity search, (3) the worker log across a create, a Scenario B recompute and a Scenario D partial, with Scenario E producing no line at all.
+
+The log image is a **syntax-highlighted rendering** of captured worker output, not a photograph of a terminal. Rather than let that pass as a terminal screenshot, the verbatim output is committed beside it as `docs/media/worker-recompute.txt` and the README says plainly what the image is. (Renamed from `.log` because `.gitignore` excludes `*.log` — it would otherwise have shipped as a broken reference.)
+
+**Demo-entry choice follows the Day 3 verification note:** the similarity panel is captured under the `entity` strategy, avoiding the semantic-space tie-crowding that would make a boilerplate-description query look like a miss.
+
+**Also worth remembering:** the client's strategy buttons carry `text-capitalize`, so `innerText` renders as `"Entity"` while `textContent` is `"entity"` — this cost a debugging cycle in the capture script and will bite any future DOM automation against this UI.
+
+**Affects:** `docs/media/*`, `README.md` demo section.
+
+---
+
+## [Day 4] Final verification pass and README
+
+**Verified end to end against the running stack** (Docker Mongo, seeded 500 with `--enrich-historical`, server, worker, client):
+
+| Scenario | Evidence |
+|---|---|
+| A | Entry created through the UI form appeared `pending`; worker logged `reason=create, pipeline=full, attempt=1`; enriched in 436 ms to risk 1.00/high, compliance fail, 4 anomalies; dashboard flipped via polling. |
+| B | `description` edit → `routing.scenario: "B"`; worker `reason=core_field_change, pipeline=full`; vector document hash **changed** (`02C481D0…` → `873B41B8…`). |
+| C | `migrate:models` moved 499 entries `risk-v0 → risk-v1` in five keyset batches (3.5 s); `stale` badges cleared in the modal and in similarity results. |
+| D | `debit` edit → `routing.scenario: "D"`; worker `reason=context_shift, pipeline=partial`; risk moved 0.00 → 0.45/medium while the vector document hash stayed **byte-identical**. Bulk `reevaluate:risk` re-scored 501 entries in 1.8 s with the sampled vector document unchanged. |
+| E | Workflow status + comment saved; `routing.scenario: "E"`; `auditMeta.lastMetadataUpdate` stamped, `analytics.enrichment` untouched, **no worker log line at all**. |
+
+`npm test` — 31/31 pass. The B-then-D sequence on one entry is the sharpest single artefact: same entry, same modal, two edits, and the vector hash moves for exactly one of them.
+
+**README structure:** quick start, `.env.example` walkthrough as a table, command table, demo media, API reference (including the error contract and the `routing` block), an architecture-decisions section distilled from this file, a scenario→implementation map, the verification results above, and an explicit known-trade-offs section (semantic tie-crowding, the D-route financial-vector staleness, no per-run job history, append-only comments, unpaginated list endpoint).
+
+**Links to `SPEC.md` were removed and reworded as prose:** `.gitignore` excludes `SPEC.md`/`CLAUDE.md`/`DAY_PLAN.md` from the deliverable, so a reviewer's clone would have hit a dead link. `DECISIONS.md` *is* tracked, so the README links to it freely.
+
+**Affects:** `README.md`, `docs/media/*`.

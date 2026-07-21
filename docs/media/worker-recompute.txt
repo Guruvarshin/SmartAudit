@@ -1,0 +1,8 @@
+[mongo] connected to localhost:27017/smartaudit
+[worker pid12576] starting: 4 lanes, poll 1000ms, lease 60000ms, max 3 attempts
+[worker pid12576:2] claimed 6a5f0b647f918d0ea897409e (JE-DEMO-113212, reason=create, pipeline=full, attempt=1)
+[worker pid12576:2] enriched 6a5f0b647f918d0ea897409e in 436ms — risk=1 (high), compliance=fail, 4 anomalies
+[worker pid12576:3] claimed 013527700000000000000039 (JE-103036, reason=core_field_change, pipeline=full, attempt=1)
+[worker pid12576:3] enriched 013527700000000000000039 in 418ms — risk=0 (low), compliance=pass, 0 anomalies
+[worker pid12576:1] claimed 013527700000000000000039 (JE-103036, reason=context_shift, pipeline=partial, attempt=1)
+[worker pid12576:1] enriched 013527700000000000000039 in 409ms — risk=0.45 (medium), compliance=fail, 1 anomaly
