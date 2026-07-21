@@ -3,9 +3,10 @@
  * service, choose a status code. No business rules live here.
  */
 export class EntryController {
-  constructor({ entryService, similaritySearchService }) {
+  constructor({ entryService, similaritySearchService, vectorDiagnosticsService }) {
     this.entryService = entryService;
     this.similaritySearchService = similaritySearchService;
+    this.vectorDiagnosticsService = vectorDiagnosticsService;
   }
 
   /**
@@ -45,6 +46,15 @@ export class EntryController {
   /** GET /api/entries/:id */
   async getById(req, res) {
     res.json(await this.entryService.getById(req.params.id));
+  }
+
+  /**
+   * GET /api/entries/:id/vectors — read-only view of the three vector spaces
+   * for the diagnostics modal. 409 while the entry is still awaiting
+   * enrichment, mirroring the similarity endpoint's contract.
+   */
+  async getVectors(req, res) {
+    res.json(await this.vectorDiagnosticsService.getForEntry(req.params.id));
   }
 
   /** GET /api/entries?limit&tier&status */

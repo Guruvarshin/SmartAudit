@@ -7,6 +7,7 @@ import { EntryRouter } from '../routers/EntryRouter.js';
 import { EntryService } from '../services/EntryService.js';
 import { SimilaritySearchService } from '../services/SimilaritySearchService.js';
 import { UpdatePlanner } from '../services/UpdatePlanner.js';
+import { VectorDiagnosticsService } from '../services/VectorDiagnosticsService.js';
 
 /**
  * Composition root for the HTTP application. Wires repository → service →
@@ -26,7 +27,15 @@ export class App {
       entryRepository,
       entryVectorsRepository
     });
-    const entryController = new EntryController({ entryService, similaritySearchService });
+    const vectorDiagnosticsService = new VectorDiagnosticsService({
+      entryRepository,
+      entryVectorsRepository
+    });
+    const entryController = new EntryController({
+      entryService,
+      similaritySearchService,
+      vectorDiagnosticsService
+    });
     this.entryRouter = new EntryRouter({ entryController });
 
     this.#mount();

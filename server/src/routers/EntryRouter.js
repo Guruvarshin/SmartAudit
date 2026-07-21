@@ -10,7 +10,7 @@ import express from 'express';
  *   PUT  /api/entries/:id             — delta-routed update         (Day 3)
  *   POST /api/entries/search/similar  — vector similarity           (Day 3)
  *
- * GET list/detail are additive conveniences for the dashboard and for
+ * GET list/detail/vectors are additive conveniences for the dashboard and for
  * verification; the spec does not mandate them (noted in DECISIONS.md).
  */
 export class EntryRouter {
@@ -26,6 +26,7 @@ export class EntryRouter {
     // Mounted before the parameterised routes so 'search' can never be
     // captured as an :id.
     this.router.post('/search/similar', this.#handle(this.controller.searchSimilar));
+    this.router.get('/:id/vectors', this.#handle(this.controller.getVectors));
     this.router.get('/:id', this.#handle(this.controller.getById));
     this.router.put('/:id', this.#handle(this.controller.update));
   }

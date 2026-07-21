@@ -19,3 +19,6 @@ DAY_PLAN.md
 STRATEGY.md
 PROMPT_SEQUENCE.md
 *.pdf
+
+# Agent tooling, not part of the deliverable.
+.claude/
