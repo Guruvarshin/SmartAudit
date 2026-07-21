@@ -53,14 +53,14 @@ export class VectorPanel extends React.Component {
     if (vectorsStatus === 'loading') {
       return (
         <p className="text-secondary small mb-0">
-          <span className="spinner-border spinner-border-sm me-1" /> Loading vectors…
+          <span className="spinner-border spinner-border-sm me-1" /> Loading vectors...
         </p>
       );
     }
     if (vectorsStatus === 'unenriched') {
       return (
         <p className="text-secondary small mb-0">
-          No vectors yet — they are computed by the background worker during enrichment.
+          No vectors yet - they are computed by the background worker during enrichment.
         </p>
       );
     }
@@ -71,10 +71,10 @@ export class VectorPanel extends React.Component {
     return (
       <div>
         <div className="text-secondary small mb-2">
-          {vectors.dims} dims per space · model{' '}
+          {vectors.dims} dims per space | model{' '}
           <span className="font-monospace">{vectors.modelVersion}</span>{' '}
-          <StaleBadge stale={vectors.stale} /> · source hash{' '}
-          <span className="font-monospace">{String(vectors.sourceHash).slice(0, 12)}…</span>
+          <StaleBadge stale={vectors.stale} /> | source hash{' '}
+          <span className="font-monospace">{String(vectors.sourceHash).slice(0, 12)}...</span>
         </div>
         <div className="row g-3">
           {VECTOR_STRATEGIES.map((space) => (
@@ -82,7 +82,7 @@ export class VectorPanel extends React.Component {
               <div className="small fw-semibold text-capitalize mb-1">
                 {space}
                 <span className="text-secondary fw-normal ms-2">
-                  ‖v‖ = {vectors.spaces[space].norm.toFixed(4)}
+                  ||v|| = {vectors.spaces[space].norm.toFixed(4)}
                 </span>
               </div>
               <VectorBars values={vectors.spaces[space].values} />

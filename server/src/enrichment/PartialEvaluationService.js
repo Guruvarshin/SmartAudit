@@ -6,7 +6,7 @@ import { ComplianceEvaluator } from './ComplianceEvaluator.js';
 import { RiskScorer } from './RiskScorer.js';
 
 /**
- * Anomaly signals, risk score and compliance flags — everything except vectors.
+ * Anomaly signals, risk score and compliance flags - everything except vectors.
  *
  * This class deliberately imports neither the EntryVectors model nor its
  * repository. That import boundary is what makes it impossible for a

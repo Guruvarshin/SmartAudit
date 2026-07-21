@@ -7,7 +7,7 @@ export class RiskPanel extends React.Component {
     const { risk } = this.props;
 
     if (!risk || risk.score === null || risk.score === undefined) {
-      return <p className="text-secondary small mb-0">Not scored yet — awaiting enrichment.</p>;
+      return <p className="text-secondary small mb-0">Not scored yet - awaiting enrichment.</p>;
     }
 
     const percent = Math.round(risk.score * 100);
@@ -42,7 +42,7 @@ export class RiskPanel extends React.Component {
                 <tr key={factor.code}>
                   <td>
                     <span className="font-monospace">{factor.code}</span>
-                    <span className="text-secondary"> — {factor.label}</span>
+                    <span className="text-secondary"> - {factor.label}</span>
                   </td>
                   <td className="text-end">{factor.weight?.toFixed(2)}</td>
                   <td className="text-end">{factor.contribution?.toFixed(2)}</td>
@@ -55,7 +55,7 @@ export class RiskPanel extends React.Component {
         )}
 
         <div className="text-secondary small">
-          model <span className="font-monospace">{risk.modelVersion}</span> · computed{' '}
+          model <span className="font-monospace">{risk.modelVersion}</span> | computed{' '}
           {Format.dateTime(risk.computedAt)}
         </div>
       </div>

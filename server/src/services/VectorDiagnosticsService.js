@@ -25,7 +25,7 @@ export class VectorDiagnosticsService {
     if (!vectors) {
       throw HttpError.conflict(
         `entry ${id} has not been enriched yet (status: ` +
-          `${entry.analytics?.enrichment?.status ?? 'unknown'}) — retry once the worker completes it`
+          `${entry.analytics?.enrichment?.status ?? 'unknown'}) - retry once the worker completes it`
       );
     }
 

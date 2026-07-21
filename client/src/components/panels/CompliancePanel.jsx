@@ -7,7 +7,7 @@ export class CompliancePanel extends React.Component {
     const { compliance } = this.props;
 
     if (!compliance || !compliance.status) {
-      return <p className="text-secondary small mb-0">Not evaluated yet — awaiting enrichment.</p>;
+      return <p className="text-secondary small mb-0">Not evaluated yet - awaiting enrichment.</p>;
     }
 
     return (
@@ -15,7 +15,7 @@ export class CompliancePanel extends React.Component {
         <div className="mb-2">
           <ComplianceBadge status={compliance.status} />
           <span className="text-secondary small ms-2">
-            ruleset <span className="font-monospace">{compliance.rulesetVersion}</span> · evaluated{' '}
+            ruleset <span className="font-monospace">{compliance.rulesetVersion}</span> | evaluated{' '}
             {Format.dateTime(compliance.evaluatedAt)}
           </span>
         </div>

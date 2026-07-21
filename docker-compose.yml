@@ -4,9 +4,9 @@ services:
     container_name: smartaudit-mongo
     command: ["--replSet", "rs0", "--bind_ip_all", "--port", "27017"]
     ports:
-      - "27017:27017"
+ - "27017:27017"
     volumes:
-      - smartaudit-mongo-data:/data/db
+ - smartaudit-mongo-data:/data/db
     # Single-node replica set. The member host is pinned to localhost:27017
     # deliberately: a replica set advertises its members' hostnames to clients,
     # and if it advertised the container's internal hostname the driver would

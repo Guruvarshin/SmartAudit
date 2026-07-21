@@ -71,7 +71,7 @@ export class DiagnosticsModal extends React.Component {
       this.setState({ entry, loadError: null });
       this.props.onEntryChanged(entry);
 
-      // A pending→complete transition means fresh analytics just landed, and
+      // A pending->complete transition means fresh analytics just landed, and
       // after a full recompute, fresh vectors too.
       const status = entry.analytics?.enrichment?.status;
       if (previousStatus && previousStatus !== status && status === 'complete') {
@@ -134,7 +134,7 @@ export class DiagnosticsModal extends React.Component {
       <div className={`alert ${tone} py-2 d-flex align-items-center gap-2 mb-3`}>
         {busy && expectsWorker && <span className="spinner-border spinner-border-sm" />}
         <div>
-          <strong>Scenario {lastRouting.scenario}</strong> — {lastRouting.action}
+          <strong>Scenario {lastRouting.scenario}</strong> - {lastRouting.action}
           {lastRouting.changedFields?.length > 0 && (
             <span className="text-secondary">
               {' '}
@@ -144,8 +144,8 @@ export class DiagnosticsModal extends React.Component {
           {expectsWorker && (
             <div className="small">
               {busy
-                ? 'Background worker is recomputing this entry…'
-                : 'Recompute finished — analytics below are fresh.'}
+                ? 'Background worker is recomputing this entry...'
+                : 'Recompute finished - analytics below are fresh.'}
             </div>
           )}
         </div>
@@ -170,12 +170,12 @@ export class DiagnosticsModal extends React.Component {
                 {entry ? (
                   <>
                     <span className="font-monospace">{entry.entryNo}</span>
-                    <span className="text-secondary"> · {entry.name}</span>{' '}
+                    <span className="text-secondary"> | {entry.name}</span>{' '}
                     <TierBadge tier={entry.analytics?.risk?.tier} />{' '}
                     <EnrichmentStatusBadge status={entry.analytics?.enrichment?.status} />
                   </>
                 ) : (
-                  'Loading…'
+                  'Loading...'
                 )}
               </h5>
               <button type="button" className="btn-close" onClick={this.props.onClose} />
@@ -224,11 +224,11 @@ export class DiagnosticsModal extends React.Component {
                     <div className="col-md-3">
                       <span className="text-secondary">Pipeline:</span>{' '}
                       <span className="font-monospace">
-                        {entry.analytics?.enrichment?.reason ?? '—'}
+                        {entry.analytics?.enrichment?.reason ?? '-'}
                       </span>
                       <span className="text-secondary">
                         {' '}
-                        · attempts {entry.analytics?.enrichment?.attempts ?? 0}
+                        | attempts {entry.analytics?.enrichment?.attempts ?? 0}
                       </span>
                       {entry.analytics?.enrichment?.lastError && (
                         <div className="text-danger">
@@ -257,7 +257,7 @@ export class DiagnosticsModal extends React.Component {
                       <h6 className="border-bottom pb-1">
                         Multi-vector diagnostics{' '}
                         <span className="text-secondary small fw-normal">
-                          — stored in the separate entry_vectors collection; untouched by
+ - stored in the separate entry_vectors collection; untouched by
                           Scenario D updates
                         </span>{' '}
                         <StaleBadge stale={this.state.vectors?.stale} />
@@ -281,7 +281,7 @@ export class DiagnosticsModal extends React.Component {
                       <h6 className="border-bottom pb-1">
                         Edit ledger fields{' '}
                         <span className="text-secondary small fw-normal">
-                          — PUT /api/entries/:id, delta-routed
+ - PUT /api/entries/:id, delta-routed
                         </span>
                       </h6>
                       <EditEntryForm
@@ -295,7 +295,7 @@ export class DiagnosticsModal extends React.Component {
                     <div className="col-lg-5">
                       <h6 className="border-bottom pb-1">
                         Audit metadata{' '}
-                        <span className="text-secondary small fw-normal">— Scenario E</span>
+                        <span className="text-secondary small fw-normal">- Scenario E</span>
                       </h6>
                       <AuditMetaPanel
                         key={`meta-${entry.updated}`}

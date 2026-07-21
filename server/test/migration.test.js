@@ -161,8 +161,8 @@ describe('Scenario C migration and Scenario D bulk re-evaluation', () => {
       fromRiskVersion: SupersededModelVersion.RISK
     });
 
-    assert.equal(vectorsUpdated, false, 'vector guard missed — worker result stands');
-    assert.equal(analyticsUpdated, false, 'analytics guard missed — worker result stands');
+    assert.equal(vectorsUpdated, false, 'vector guard missed - worker result stands');
+    assert.equal(analyticsUpdated, false, 'analytics guard missed - worker result stands');
     assert.deepEqual((await repository.findById(doc._id)).analytics, workerAnalytics);
     assert.deepEqual(await EntryVectors.findById(doc._id).lean(), workerVectors);
   });

@@ -1,4 +1,4 @@
-/** HTTP translation only — no business rules live here. */
+/** HTTP translation only - no business rules live here. */
 export class EntryController {
   constructor({ entryService, similaritySearchService, vectorDiagnosticsService }) {
     this.entryService = entryService;
@@ -10,7 +10,7 @@ export class EntryController {
     res.json(await this.similaritySearchService.search(req.body));
   }
 
-  /** 201 with status 'pending' — the contract is "accepted, enriched asynchronously". */
+  /** 201 with status 'pending' - the contract is "accepted, enriched asynchronously". */
   async create(req, res) {
     const entry = await this.entryService.create(req.body);
     res.status(201).json(entry);

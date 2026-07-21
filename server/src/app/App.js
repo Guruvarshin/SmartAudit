@@ -12,7 +12,7 @@ import { SimilaritySearchService } from '../services/SimilaritySearchService.js'
 import { UpdatePlanner } from '../services/UpdatePlanner.js';
 import { VectorDiagnosticsService } from '../services/VectorDiagnosticsService.js';
 
-/** Composition root: wires repository → service → controller → router. */
+/** Composition root: wires repository -> service -> controller -> router. */
 export class App {
   constructor({ logger = console } = {}) {
     this.logger = logger;

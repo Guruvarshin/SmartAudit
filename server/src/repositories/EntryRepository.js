@@ -64,7 +64,7 @@ export class EntryRepository {
    * Atomic claim: MongoDB applies this filter-and-update to a single document
    * indivisibly, so racing workers cannot claim the same job.
    *
-   * The second $or branch is crash recovery — a claim older than the lease
+   * The second $or branch is crash recovery - a claim older than the lease
    * belongs to a presumed-dead worker and becomes claimable again. Safe
    * because every pipeline write is idempotent.
    */
@@ -89,7 +89,7 @@ export class EntryRepository {
         },
         $inc: { 'analytics.enrichment.attempts': 1 }
       },
-      // Claiming is queue bookkeeping, not a record edit — it must not bump `updated`.
+      // Claiming is queue bookkeeping, not a record edit - it must not bump `updated`.
       { sort: { _id: 1 }, returnDocument: 'after', lean: true, timestamps: false }
     );
   }
@@ -241,7 +241,7 @@ export class EntryRepository {
   }
 
   /**
-   * Guarded only on the entry being settled — an in-flight recompute owns the
+   * Guarded only on the entry being settled - an in-flight recompute owns the
    * entry and will apply current thresholds itself. Touches analytics.* only;
    * nothing on this path can reach the vectors collection.
    */

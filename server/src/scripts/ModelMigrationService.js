@@ -24,7 +24,7 @@ export class ModelMigrationService {
     const staleVersions = await this.#staleVersions();
 
     if (staleVersions.length === 0) {
-      this.logger.log(`[migrate] nothing to do — every entry is at ${ModelVersion.RISK}`);
+      this.logger.log(`[migrate] nothing to do - every entry is at ${ModelVersion.RISK}`);
       return { migrated: 0, skipped: 0, versions: {} };
     }
 
@@ -33,7 +33,7 @@ export class ModelMigrationService {
       const count = await this.entryRepository.countByRiskModelVersion(version);
       this.logger.log(
         `[migrate] ${count} completed entr${count === 1 ? 'y' : 'ies'} at ${version} ` +
-          `→ ${ModelVersion.RISK}${this.dryRun ? ' (dry run, not migrating)' : ''}`
+          `-> ${ModelVersion.RISK}${this.dryRun ? ' (dry run, not migrating)' : ''}`
       );
       report.versions[version] = { found: count, migrated: 0, skipped: 0 };
       if (this.dryRun) continue;
@@ -45,7 +45,7 @@ export class ModelMigrationService {
     this.logger.log(
       this.dryRun
         ? `[migrate] dry run complete in ${seconds}s`
-        : `[migrate] done in ${seconds}s — migrated=${report.migrated} skipped=${report.skipped}`
+        : `[migrate] done in ${seconds}s - migrated=${report.migrated} skipped=${report.skipped}`
     );
     return report;
   }

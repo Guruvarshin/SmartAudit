@@ -2,7 +2,7 @@
   "name": "smartaudit-client",
   "version": "1.0.0",
   "private": true,
-  "description": "SmartAudit UI Command Center — React class components only (no hooks)",
+  "description": "SmartAudit UI Command Center - React class components only (no hooks)",
   "type": "module",
   "engines": {
     "node": ">=20"

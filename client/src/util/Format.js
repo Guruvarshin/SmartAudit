@@ -1,6 +1,6 @@
 export class Format {
   static money(value, currency) {
-    if (value === null || value === undefined) return '—';
+    if (value === null || value === undefined) return '-';
     try {
       return new Intl.NumberFormat('en-IN', {
         style: 'currency',
@@ -13,7 +13,7 @@ export class Format {
   }
 
   static date(value) {
-    if (!value) return '—';
+    if (!value) return '-';
     return new Date(value).toLocaleDateString(undefined, {
       year: 'numeric',
       month: 'short',
@@ -22,17 +22,17 @@ export class Format {
   }
 
   static dateTime(value) {
-    if (!value) return '—';
+    if (!value) return '-';
     return new Date(value).toLocaleString();
   }
 
   static score(value) {
-    if (value === null || value === undefined) return '—';
+    if (value === null || value === undefined) return '-';
     return value.toFixed(2);
   }
 
   static truncate(text, max = 60) {
     if (!text) return '';
-    return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+    return text.length > max ? `${text.slice(0, max - 1)}...` : text;
   }
 }

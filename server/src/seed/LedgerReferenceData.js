@@ -2,7 +2,7 @@
  * Reference data for generated ledgers.
  *
  * Descriptions are paired to their GL account so entries read like a real
- * chart of accounts — the semantic-anomaly cohort is only detectable as
+ * chart of accounts - the semantic-anomaly cohort is only detectable as
  * anomalous relative to a plausible baseline.
  */
 
@@ -142,7 +142,7 @@ export const VENDORS = Object.freeze([
 
 /**
  * Descriptions that should read as uncharacteristic against the vocabulary
- * above — the intended targets of a semantic anomaly.
+ * above - the intended targets of a semantic anomaly.
  */
 export const SUSPICIOUS_DESCRIPTIONS = Object.freeze([
   'misc adjustment',
@@ -202,7 +202,7 @@ export const Cohort = Object.freeze({
 });
 
 /**
- * Weighted so most of the ledger is unremarkable — a seed where a third of
+ * Weighted so most of the ledger is unremarkable - a seed where a third of
  * entries are anomalous would make the risk scorer look good for the wrong
  * reason.
  */

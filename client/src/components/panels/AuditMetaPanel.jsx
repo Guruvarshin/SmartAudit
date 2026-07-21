@@ -5,7 +5,7 @@ import { WorkflowBadge } from '../Badges.jsx';
 
 /**
  * Workflow status and append-only comments. Saved through the same PUT, but
- * routed synchronously by the backend — no queue, no worker.
+ * routed synchronously by the backend - no queue, no worker.
  */
 export class AuditMetaPanel extends React.Component {
   constructor(props) {
@@ -108,7 +108,7 @@ export class AuditMetaPanel extends React.Component {
             <div className="col-8">
               <input
                 className="form-control form-control-sm"
-                placeholder="Append an audit comment…"
+                placeholder="Append an audit comment..."
                 value={commentText}
                 onChange={this.handleText}
               />
@@ -123,7 +123,7 @@ export class AuditMetaPanel extends React.Component {
             disabled={saving || Object.keys(changes).length === 0}
           >
             {saving && <span className="spinner-border spinner-border-sm me-1" />}
-            {saving ? 'Saving…' : 'Save metadata (Scenario E — synchronous)'}
+            {saving ? 'Saving...' : 'Save metadata (Scenario E - synchronous)'}
           </button>
         </form>
 
@@ -135,7 +135,7 @@ export class AuditMetaPanel extends React.Component {
               .map((comment, index) => (
                 <li className="list-group-item px-0 py-1" key={`${comment.at}-${index}`}>
                   <span className="fw-semibold">{comment.author}</span>
-                  <span className="text-secondary"> · {Format.dateTime(comment.at)}</span>
+                  <span className="text-secondary"> | {Format.dateTime(comment.at)}</span>
                   <div>{comment.text}</div>
                 </li>
               ))}

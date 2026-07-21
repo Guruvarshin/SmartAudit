@@ -7,7 +7,7 @@ import dotenv from 'dotenv';
  *
  * Imported first by both Config and the domain constants, because some
  * constants (model versions, risk thresholds) are environment-tunable and are
- * evaluated at module load — before any entry point could call a loader
+ * evaluated at module load - before any entry point could call a loader
  * function. ES module imports execute in source order, so importing this file
  * first guarantees the values are present.
  *

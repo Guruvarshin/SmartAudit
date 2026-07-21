@@ -61,12 +61,12 @@ export class EntryFilters extends React.Component {
                 className="spinner-grow spinner-grow-sm me-1 text-info"
                 style={{ width: '0.6em', height: '0.6em' }}
               />
-              worker active — polling every 2s
+              worker active - polling every 2s
             </>
           ) : (
-            <>idle — polling every 10s</>
+            <>idle - polling every 10s</>
           )}
-          {lastRefreshedAt && <> · updated {lastRefreshedAt.toLocaleTimeString()}</>}
+          {lastRefreshedAt && <> | updated {lastRefreshedAt.toLocaleTimeString()}</>}
         </span>
       </div>
     );

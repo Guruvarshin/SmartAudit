@@ -10,7 +10,7 @@ const TOP_K = 5;
  * streaming scan. The strategy only selects which stored array and norm
  * participate, so all three share one implementation.
  *
- * Cosine reduces to dot ÷ (two stored norms) because the norms are computed
+ * Cosine reduces to dot / (two stored norms) because the norms are computed
  * at enrichment time. Memory stays bounded by the cursor batch plus a fixed
  * 5-slot table, regardless of collection size.
  */
@@ -30,14 +30,14 @@ export class SimilaritySearchService {
     if (!queryVectors) {
       throw HttpError.conflict(
         `entry ${entryId} has not been enriched yet (status: ` +
-          `${entry.analytics?.enrichment?.status ?? 'unknown'}) — retry once the worker completes it`
+          `${entry.analytics?.enrichment?.status ?? 'unknown'}) - retry once the worker completes it`
       );
     }
 
     const queryArray = queryVectors[strategy];
     const queryNorm = queryVectors.norms[strategy];
     if (!queryNorm) {
-      // A zero vector is similar to nothing — degenerate input, not an error.
+      // A zero vector is similar to nothing - degenerate input, not an error.
       return { entryId: String(entryId), strategy, results: [] };
     }
 
@@ -50,7 +50,7 @@ export class SimilaritySearchService {
   }
 
   async #scan(companyId, selfId, strategy, queryArray, queryNorm) {
-    const top = []; // insertion into ≤5 slots; a heap is ceremony at k=5
+    const top = []; // insertion into <=5 slots; a heap is ceremony at k=5
     const cursor = this.entryVectorsRepository.streamCompanySpace(companyId, strategy);
 
     for await (const candidate of cursor) {

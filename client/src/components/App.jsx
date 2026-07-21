@@ -19,7 +19,7 @@ export class App extends React.Component {
       <div className="min-vh-100 bg-light">
         <nav className="navbar navbar-dark bg-dark px-3 mb-3">
           <span className="navbar-brand fw-semibold">
-            SmartAudit <span className="text-secondary">· Audit Command Center</span>
+            SmartAudit <span className="text-secondary">| Audit Command Center</span>
           </span>
         </nav>
         <main className="container-fluid px-4 pb-5">

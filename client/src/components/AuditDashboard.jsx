@@ -11,7 +11,7 @@ import { SummaryBar } from './SummaryBar.jsx';
  * worker enriches asynchronously.
  *
  * The queue state is `analytics.enrichment.status` on the entry itself, so
- * re-fetching the list is reading the queue — there is no separate job API. A
+ * re-fetching the list is reading the queue - there is no separate job API. A
  * setTimeout chain rather than setInterval, so a slow response can never
  * overlap the next tick; it re-arms fast while anything is in flight and
  * slowly once everything is settled.
@@ -146,14 +146,14 @@ export class AuditDashboard extends React.Component {
 
         {loadError && (
           <div className="alert alert-danger py-2">
-            Could not load entries: {loadError} — retrying automatically.
+            Could not load entries: {loadError} - retrying automatically.
           </div>
         )}
 
         {entries === null ? (
           <div className="text-center py-5">
             <div className="spinner-border text-secondary" role="status" />
-            <div className="mt-2 text-secondary">Loading ledger…</div>
+            <div className="mt-2 text-secondary">Loading ledger...</div>
           </div>
         ) : (
           <EntryTable entries={entries} onOpenEntry={this.handleOpenEntry} />

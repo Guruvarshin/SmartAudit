@@ -8,7 +8,7 @@ import { VectorGenerator } from './VectorGenerator.js';
  * has one implementation) plus vectors, and the ordered two-collection write.
  *
  * There is no cross-collection transaction. Vectors are written first, then a
- * single fenced $set lands the analytics and flips status to complete — that
+ * single fenced $set lands the analytics and flips status to complete - that
  * flip is the commit point, so a crashed run is simply reclaimed after its
  * lease and re-run, and no partial state is ever readable as complete.
  */
@@ -94,7 +94,7 @@ export class EnrichmentService {
     return { vectorsUpdated, analyticsUpdated };
   }
 
-  /** Pure computation, shared by every path — no writes. */
+  /** Pure computation, shared by every path - no writes. */
   async compute(entry, { simulateModelDelay }) {
     if (simulateModelDelay) {
       // Stands in for a real model execution (spec: Scenario A).

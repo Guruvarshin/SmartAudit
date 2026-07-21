@@ -11,7 +11,7 @@ const INSERT_CHUNK_SIZE = 250;
 
 /**
  * Clears prior seed data, rebuilds indexes, inserts a generated ledger, and
- * reports what was planted — that report is what detection output gets
+ * reports what was planted - that report is what detection output gets
  * compared against.
  */
 export class SeedRunner {
@@ -41,7 +41,7 @@ export class SeedRunner {
   /**
    * Backfills every seeded entry through the real enrichment service, stamped
    * at superseded model versions, so the migration has genuinely stale records
-   * to page through. Deliberately not a second implementation — the same
+   * to page through. Deliberately not a second implementation - the same
    * service with different version stamps, minus the simulated delay.
    */
   async #enrichHistorical() {

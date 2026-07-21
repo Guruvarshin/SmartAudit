@@ -2,7 +2,7 @@ import { AnomalySeverity, AnomalyType, APPROVAL_THRESHOLD } from '../domain/Cons
 
 /**
  * The detector's own model of suspicion. Deliberately not imported from the
- * seed's planted descriptions — that would be reading the answer key rather
+ * seed's planted descriptions - that would be reading the answer key rather
  * than detecting anything.
  */
 const EVASIVE_TERMS = Object.freeze([
@@ -32,9 +32,9 @@ const SMALL_HOURS_END = 6;
 
 /**
  * Evaluates fields independently and emits one signal per finding, each
- * naming its type and the field it was raised against (spec §3.2).
+ * naming its type and the field it was raised against (spec section 3.2).
  *
- * Pure computation — the amount baseline is fetched by the caller so this
+ * Pure computation - the amount baseline is fetched by the caller so this
  * class stays trivially testable.
  */
 export class AnomalyDetector {

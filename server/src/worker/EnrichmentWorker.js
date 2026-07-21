@@ -97,14 +97,14 @@ export class EnrichmentWorker {
         // Our claim was superseded mid-run and the fence rejected the commit;
         // the other worker's result stands.
         this.stats.discarded += 1;
-        this.logger.log(`${tag} DISCARDED ${entry._id} — claim superseded during run (${ms}ms)`);
+        this.logger.log(`${tag} DISCARDED ${entry._id} - claim superseded during run (${ms}ms)`);
         return;
       }
 
       this.stats.completed += 1;
       const anomalyCount = artifacts.anomalies.length;
       this.logger.log(
-        `${tag} enriched ${entry._id} in ${ms}ms — ` +
+        `${tag} enriched ${entry._id} in ${ms}ms - ` +
           `risk=${artifacts.risk.score} (${artifacts.risk.tier}), ` +
           `compliance=${artifacts.compliance.status}, ` +
           `${anomalyCount} anomal${anomalyCount === 1 ? 'y' : 'ies'}`

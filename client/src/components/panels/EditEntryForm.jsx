@@ -1,7 +1,7 @@
 import React from 'react';
 import { ApiError } from '../../api/ApiClient.js';
 
-/** ISO date → datetime-local string, for editing and dirty comparison. */
+/** ISO date -> datetime-local string, for editing and dirty comparison. */
 function toLocalInput(value) {
   if (!value) return '';
   const date = new Date(value);
@@ -25,7 +25,7 @@ function draftFromEntry(entry) {
  *
  * - Sends only changed keys, matching the planner's diff-based classification
  *   and keeping routing.changedFields meaningful.
- * - Disables while saving. This is UX suppression only — a click that slips
+ * - Disables while saving. This is UX suppression only - a click that slips
  *   through is harmless, because the backend diffs a re-send to a no-op.
  * - Treats 409 as reload, never blind retry: the server is the arbiter, so we
  *   refetch and let the auditor consciously re-apply.
@@ -195,7 +195,7 @@ export class EditEntryForm extends React.Component {
 
         {conflictNotice && (
           <div className="alert alert-warning py-1 px-2 small mt-2 mb-0">
-            This entry changed on the server while you were editing — the form has been reloaded
+            This entry changed on the server while you were editing - the form has been reloaded
             with the latest values. Re-apply your change if it still makes sense.
           </div>
         )}
@@ -208,7 +208,7 @@ export class EditEntryForm extends React.Component {
             disabled={saving || dirtyCount === 0}
           >
             {saving && <span className="spinner-border spinner-border-sm me-1" />}
-            {saving ? 'Saving…' : `Save ${dirtyCount > 0 ? `${dirtyCount} change${dirtyCount > 1 ? 's' : ''}` : ''}`}
+            {saving ? 'Saving...' : `Save ${dirtyCount > 0 ? `${dirtyCount} change${dirtyCount > 1 ? 's' : ''}` : ''}`}
           </button>
           <button
             type="button"
@@ -219,7 +219,7 @@ export class EditEntryForm extends React.Component {
             Reset
           </button>
           <span className="small text-secondary">
-            B fields → full recompute · D fields → risk-only re-evaluation (vectors untouched)
+            B fields -> full recompute | D fields -> risk-only re-evaluation (vectors untouched)
           </span>
         </div>
       </form>

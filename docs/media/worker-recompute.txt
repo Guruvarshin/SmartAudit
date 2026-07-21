@@ -1,14 +1,8 @@
 [mongo] connected to localhost:27017/smartaudit
-[worker pid24532] starting: 4 lanes, poll 1000ms, lease 60000ms, max 3 attempts
-[worker pid24532:3] claimed 6a5f387da3186473707f3ce1 (JE-WALK-01, reason=create, pipeline=full, attempt=1)
-[worker pid24532:3] enriched 6a5f387da3186473707f3ce1 in 433ms — risk=1 (high), compliance=fail, 4 anomalies
-[worker pid24532:3] claimed 013527700000000000000188 (JE-103069, reason=core_field_change, pipeline=full, attempt=1)
-[worker pid24532:3] enriched 013527700000000000000188 in 417ms — risk=0 (low), compliance=pass, 0 anomalies
-[worker pid24532:3] claimed 013527700000000000000188 (JE-103069, reason=context_shift, pipeline=partial, attempt=1)
-[worker pid24532:3] enriched 013527700000000000000188 in 412ms — risk=0.45 (medium), compliance=fail, 1 anomaly
-[worker pid24532:2] claimed 6a5f3954a3186473707f3cfa (JE-WALK-02, reason=create, pipeline=full, attempt=1)
-[worker pid24532:2] enriched 6a5f3954a3186473707f3cfa in 422ms — risk=1 (high), compliance=fail, 4 anomalies
-[worker pid24532:0] claimed 013527700000000000000188 (JE-103069, reason=core_field_change, pipeline=full, attempt=1)
-[worker pid24532:0] enriched 013527700000000000000188 in 422ms — risk=0.45 (medium), compliance=fail, 1 anomaly
-[worker pid24532:0] claimed 013527700000000000000188 (JE-103069, reason=context_shift, pipeline=partial, attempt=1)
-[worker pid24532:0] enriched 013527700000000000000188 in 418ms — risk=0.45 (medium), compliance=fail, 1 anomaly
+[worker pid9640] starting: 4 lanes, poll 1000ms, lease 60000ms, max 3 attempts
+[worker pid9640:2] claimed 6a5f7c06e8170b04084e213b (JE-WALK-01, reason=create, pipeline=full, attempt=1)
+[worker pid9640:2] enriched 6a5f7c06e8170b04084e213b in 458ms - risk=1 (high), compliance=fail, 4 anomalies
+[worker pid9640:0] claimed 013527700000000000000188 (JE-103069, reason=core_field_change, pipeline=full, attempt=1)
+[worker pid9640:0] enriched 013527700000000000000188 in 428ms - risk=0 (low), compliance=pass, 0 anomalies
+[worker pid9640:2] claimed 013527700000000000000188 (JE-103069, reason=context_shift, pipeline=partial, attempt=1)
+[worker pid9640:2] enriched 013527700000000000000188 in 419ms - risk=0.45 (medium), compliance=fail, 1 anomaly

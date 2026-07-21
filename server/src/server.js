@@ -4,7 +4,7 @@ import { MongoConnection } from './db/MongoConnection.js';
 import { WorkerFactory } from './worker/WorkerFactory.js';
 
 /**
- * Entry point for `npm run start:server`. Process concerns only — the
+ * Entry point for `npm run start:server`. Process concerns only - the
  * application itself lives in App.
  *
  * With RUN_WORKER_IN_PROCESS set, this process also runs the enrichment

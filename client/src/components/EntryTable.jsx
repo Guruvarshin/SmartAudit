@@ -43,7 +43,7 @@ export class EntryRow extends React.Component {
           <span className="me-1 small fw-semibold">{Format.score(risk?.score)}</span>
           <TierBadge tier={risk?.tier} />
         </td>
-        <td className="text-center small">{anomalies.length > 0 ? anomalies.length : '—'}</td>
+        <td className="text-center small">{anomalies.length > 0 ? anomalies.length : '-'}</td>
         <td className="text-center">
           <ComplianceBadge status={entry.analytics?.compliance?.status} />
         </td>
@@ -76,7 +76,7 @@ export class EntryTable extends React.Component {
         <table className="table table-hover table-sm align-middle mb-0">
           <thead className="table-light">
             <tr>
-              <th>Entry №</th>
+              <th>Entry No.</th>
               <th>Posted</th>
               <th>Name</th>
               <th>Description</th>

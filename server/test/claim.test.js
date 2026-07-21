@@ -8,7 +8,7 @@ import { EntryRepository } from '../src/repositories/EntryRepository.js';
 
 /**
  * The queue's race-condition mitigation: atomic claim, lease, fenced
- * completion. Runs against a real MongoDB in a separate test database —
+ * completion. Runs against a real MongoDB in a separate test database -
  * the mechanism under test is MongoDB's single-document atomicity, so
  * mocking the database would test nothing.
  */

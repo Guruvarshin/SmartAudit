@@ -31,7 +31,7 @@ export class EntryService {
 
   /**
    * A new entry is born `pending`, the claimable state, so persisting it is
-   * also the enqueue — there is no window where an entry exists but its
+   * also the enqueue - there is no window where an entry exists but its
    * enrichment job does not.
    */
   async create(payload) {
@@ -52,7 +52,7 @@ export class EntryService {
   }
 
   /**
-   * Fresh read → classify the diff → one CAS-guarded write. A CAS miss means
+   * Fresh read -> classify the diff -> one CAS-guarded write. A CAS miss means
    * a concurrent content write landed in between, so we re-plan once from a
    * fresh read before giving up with 409.
    */

@@ -19,7 +19,7 @@ const MS_PER_DAY = 86400000;
 
 /**
  * Generates a ledger with deliberately planted audit signal, so detection has
- * something real to find — uniformly clean data would let a risk scorer that
+ * something real to find - uniformly clean data would let a risk scorer that
  * returns a constant look correct.
  *
  * Cohort tags are tracked alongside the documents, never written onto them:
@@ -106,7 +106,7 @@ export class EntryFactory {
       case Cohort.ROUNDING:
         amount = this.rng.bool(0.5)
           ? this.rng.pick([250000, 500000, 1000000, 2000000])
-          : // Clustering just under an internal approval limit — the classic
+          : // Clustering just under an internal approval limit - the classic
             // structuring pattern.
             APPROVAL_THRESHOLD - this.rng.pick([100, 500, 1000, 2000]);
         break;
@@ -146,7 +146,7 @@ export class EntryFactory {
     const baseDescription = this.rng.pick(account.descriptions);
     const sides = this.#balancedSides(amount, account);
 
-    // Same vendor, same amount, same day — the kind of duplicated posting an
+    // Same vendor, same amount, same day - the kind of duplicated posting an
     // auditor would want surfaced. Descriptions vary only cosmetically.
     const variants = [
       baseDescription,
@@ -199,7 +199,7 @@ export class EntryFactory {
       systemCreated,
       uploadSourceType: this.#uploadSourceType()
       // `analytics` and `auditMeta` are omitted so schema defaults leave
-      // enrichment at `pending` — the state the worker needs to find.
+      // enrichment at `pending` - the state the worker needs to find.
     };
   }
 
@@ -233,7 +233,7 @@ export class EntryFactory {
   // Dates
   // ---------------------------------------------------------------------------
 
-  /** A weekday posting during business hours — the unremarkable case. */
+  /** A weekday posting during business hours - the unremarkable case. */
   #businessHoursDate() {
     let date;
     do {
@@ -245,7 +245,7 @@ export class EntryFactory {
   }
 
   /**
-   * A posting at a time no one legitimately books ledger entries. SPEC.md §3.1
+   * A posting at a time no one legitimately books ledger entries. SPEC.md section 3.1
    * names "2:00 AM on a Sunday" specifically, so weekend small-hours postings
    * are the dominant shape here.
    */
@@ -294,9 +294,9 @@ export class EntryFactory {
    * Mongo generate one.
    *
    * Without this, re-seeding produces byte-identical *content* under new ids,
-   * so anything that references an entry by id — a README curl example for
+   * so anything that references an entry by id - a README curl example for
    * POST /api/entries/search/similar, which takes an entry id as its input, or
-   * a saved request collection — silently breaks the moment the reviewer
+   * a saved request collection - silently breaks the moment the reviewer
    * re-runs the seed. Deriving the id from the seed makes `npm run seed`
    * reproducible in identity as well as in content.
    */

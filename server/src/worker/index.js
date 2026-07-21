@@ -38,7 +38,7 @@ class WorkerCommand {
       process.on(signal, async () => {
         if (shuttingDown) return;
         shuttingDown = true;
-        console.log(`[worker] ${signal} received — finishing in-flight jobs`);
+        console.log(`[worker] ${signal} received - finishing in-flight jobs`);
         await this.worker.stop();
         await this.connection.disconnect();
         process.exit(0);

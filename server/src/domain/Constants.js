@@ -3,7 +3,7 @@ import '../config/env.js';
 /**
  * Shared domain vocabulary.
  *
- * Frozen value objects rather than classes because they carry no behaviour —
+ * Frozen value objects rather than classes because they carry no behaviour -
  * they are the enumerated vocabulary the schemas, worker and scripts all
  * validate against. The strict-OO requirement applies to anything carrying
  * logic; declarative data like this is not wrapped in a ceremonial class.
@@ -64,7 +64,7 @@ export const EnrichmentStatus = Object.freeze({
   FAILED: 'failed'
 });
 
-/** Why an entry was queued — drives which pipeline the worker runs. */
+/** Why an entry was queued - drives which pipeline the worker runs. */
 export const EnrichmentReason = Object.freeze({
   CREATE: 'create',
   CORE_FIELD_CHANGE: 'core_field_change',
@@ -121,7 +121,7 @@ export const VECTOR_DIMS = 64;
  * An internal approval limit; amounts clustering just beneath it are the
  * classic structuring pattern. Lives here rather than in the seed's reference
  * data because a threshold shift mutates exactly this, and because the
- * detector must never import seed data — reading the answer key is not
+ * detector must never import seed data - reading the answer key is not
  * detection. The seed imports this constant so planted data and detection
  * cannot drift apart.
  */

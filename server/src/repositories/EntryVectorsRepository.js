@@ -3,7 +3,7 @@ import { EntryVectors } from '../models/EntryVectors.js';
 /**
  * All access to the `entry_vectors` collection.
  *
- * The risk-update path must never import this class — that import boundary is
+ * The risk-update path must never import this class - that import boundary is
  * what guarantees a risk-only update cannot touch vectors.
  */
 export class EntryVectorsRepository {

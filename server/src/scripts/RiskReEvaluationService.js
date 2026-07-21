@@ -6,7 +6,7 @@ import { KeysetPager } from '../util/KeysetPager.js';
  * risk, compliance and anomaly signals for every settled entry via a targeted
  * $set on analytics.*, leaving vectors untouched.
  *
- * That last part is structural, not behavioural — nothing this class composes
+ * That last part is structural, not behavioural - nothing this class composes
  * imports the EntryVectors model or repository, so there is no code path from
  * here to the vectors collection at all.
  */
@@ -56,8 +56,8 @@ export class RiskReEvaluationService {
 
     const seconds = ((Date.now() - startedAt) / 1000).toFixed(1);
     this.logger.log(
-      `[reevaluate] done in ${seconds}s — reEvaluated=${report.reEvaluated} ` +
-        `tierChanged=${report.tierChanged} skipped=${report.skipped} — vectors untouched`
+      `[reevaluate] done in ${seconds}s - reEvaluated=${report.reEvaluated} ` +
+        `tierChanged=${report.tierChanged} skipped=${report.skipped} - vectors untouched`
     );
     return report;
   }
@@ -84,8 +84,8 @@ export class RiskReEvaluationService {
       report.tierChanged += 1;
       this.logger.log(
         `[reevaluate] ${entry._id} (${entry.entryNo}): tier ` +
-          `${entry.analytics?.risk?.tier} → ${artifacts.risk.tier} ` +
-          `(score ${entry.analytics?.risk?.score} → ${artifacts.risk.score})`
+          `${entry.analytics?.risk?.tier} -> ${artifacts.risk.tier} ` +
+          `(score ${entry.analytics?.risk?.score} -> ${artifacts.risk.score})`
       );
     }
   }

@@ -74,7 +74,7 @@ export class NewEntryForm extends React.Component {
     if (this.state.submitting) return; // double-click guard
     const template = this.props.template;
     if (!template) {
-      this.setState({ error: 'No existing entry to inherit company/user identity from — seed the database first.' });
+      this.setState({ error: 'No existing entry to inherit company/user identity from - seed the database first.' });
       return;
     }
 
@@ -121,7 +121,7 @@ export class NewEntryForm extends React.Component {
         <div className="card-header d-flex align-items-center py-2">
           <span className="fw-semibold">New journal entry</span>
           <span className="small text-secondary ms-2">
-            POST /api/entries — enriched asynchronously by the worker (Scenario A)
+            POST /api/entries - enriched asynchronously by the worker (Scenario A)
           </span>
           <button
             type="button"
@@ -147,7 +147,7 @@ export class NewEntryForm extends React.Component {
                 />
               </div>
               <div className="col-md-2">
-                <label className="form-label small mb-0">Entry №</label>
+                <label className="form-label small mb-0">Entry No.</label>
                 <input
                   className="form-control form-control-sm"
                   name="entryNo"
@@ -251,7 +251,7 @@ export class NewEntryForm extends React.Component {
             <div className="d-flex gap-2 mt-3">
               <button type="submit" className="btn btn-sm btn-primary" disabled={submitting}>
                 {submitting && <span className="spinner-border spinner-border-sm me-1" />}
-                {submitting ? 'Creating…' : 'Create entry'}
+                {submitting ? 'Creating...' : 'Create entry'}
               </button>
               <button
                 type="button"

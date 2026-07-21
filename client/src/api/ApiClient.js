@@ -1,6 +1,6 @@
 /**
- * Carries the HTTP status so components can branch on it — notably the 409
- * conflict reload path — without string-matching error messages.
+ * Carries the HTTP status so components can branch on it - notably the 409
+ * conflict reload path - without string-matching error messages.
  */
 export class ApiError extends Error {
   constructor(status, message, details = null) {

@@ -10,7 +10,7 @@ import {
 export class TierBadge extends React.Component {
   render() {
     const { tier } = this.props;
-    if (!tier) return <span className="badge text-bg-light border">—</span>;
+    if (!tier) return <span className="badge text-bg-light border">-</span>;
     return <span className={`badge ${TIER_BADGE_CLASS[tier] ?? 'text-bg-secondary'}`}>{tier}</span>;
   }
 }
@@ -48,7 +48,7 @@ export class SeverityBadge extends React.Component {
 export class ComplianceBadge extends React.Component {
   render() {
     const { status } = this.props;
-    if (!status) return <span className="badge text-bg-light border">—</span>;
+    if (!status) return <span className="badge text-bg-light border">-</span>;
     return (
       <span className={`badge ${COMPLIANCE_BADGE_CLASS[status] ?? 'text-bg-secondary'}`}>
         {status}
@@ -73,7 +73,7 @@ export class StaleBadge extends React.Component {
   render() {
     if (!this.props.stale) return null;
     return (
-      <span className="badge text-bg-warning" title="Vectors computed by a superseded model version — run npm run migrate:models">
+      <span className="badge text-bg-warning" title="Vectors computed by a superseded model version - run npm run migrate:models">
         stale model
       </span>
     );

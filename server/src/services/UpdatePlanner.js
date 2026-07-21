@@ -13,12 +13,12 @@ import { HttpError } from '../http/HttpError.js';
  * Turns a PUT payload into an update plan: which scenario applies, what to
  * $set/$push, and whether to re-enqueue enrichment.
  *
- * Classification is diff-based, not presence-based — a field counts as changed
+ * Classification is diff-based, not presence-based - a field counts as changed
  * only when its value differs from the stored one, which is what makes a
  * double-clicked save free.
  *
  * The accepted field set is closed: every field maps to exactly one scenario
- * (core → B, balance → D, auditMeta → E) and anything else is a 400.
+ * (core -> B, balance -> D, auditMeta -> E) and anything else is a 400.
  */
 export class UpdatePlanner {
   static #ALLOWED_TOP_LEVEL = new Set([
@@ -31,12 +31,12 @@ export class UpdatePlanner {
 
   static #DESCRIPTIONS = Object.freeze({
     [UpdateScenario.CORE_FIELD_CHANGE]:
-      'core financial field changed — vectors, risk and anomalies invalidated; full recomputation queued',
+      'core financial field changed - vectors, risk and anomalies invalidated; full recomputation queued',
     [UpdateScenario.RISK_CONTEXT_CHANGE]:
-      'balance side changed — partial re-evaluation queued (risk/compliance/anomalies only, vectors untouched)',
+      'balance side changed - partial re-evaluation queued (risk/compliance/anomalies only, vectors untouched)',
     [UpdateScenario.METADATA_ONLY]:
-      'metadata-only edit — saved atomically, asynchronous queue bypassed entirely',
-    [UpdateScenario.NO_OP]: 'no effective change — nothing written, nothing queued'
+      'metadata-only edit - saved atomically, asynchronous queue bypassed entirely',
+    [UpdateScenario.NO_OP]: 'no effective change - nothing written, nothing queued'
   });
 
   plan(entry, payload) {

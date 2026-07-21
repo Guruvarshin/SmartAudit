@@ -20,8 +20,8 @@ import { EntryService } from '../src/services/EntryService.js';
 import { UpdatePlanner } from '../src/services/UpdatePlanner.js';
 
 /**
- * The PUT delta router: core field → full recompute, balance side → partial
- * re-evaluation with vectors untouched, metadata-only → no queue. Real
+ * The PUT delta router: core field -> full recompute, balance side -> partial
+ * re-evaluation with vectors untouched, metadata-only -> no queue. Real
  * MongoDB, since the atomic combined write, CAS and fence interaction are
  * MongoDB behaviours.
  */
@@ -153,7 +153,7 @@ describe('PUT delta routing', () => {
 
     it('rejects fields outside the closed taxonomy with 400', async () => {
       const entry = await enrichedEntry();
-      assert.throws(() => planner.plan(entry, { name: 'Другой Vendor' }), (error) => {
+      assert.throws(() => planner.plan(entry, { name: 'Nonstandard Vendor' }), (error) => {
         assert.equal(error.status, 400);
         return true;
       });
@@ -165,7 +165,7 @@ describe('PUT delta routing', () => {
 
     it('a D-route enqueue never downgrades a pending full recompute', async () => {
       const entry = await enrichedEntry();
-      await service.update(String(entry._id), { amount: 5000 }); // → pending, core_field_change
+      await service.update(String(entry._id), { amount: 5000 }); // -> pending, core_field_change
       const pending = await repository.findById(entry._id);
       const plan = planner.plan(pending, { credit: 123 });
       assert.equal(plan.scenario, UpdateScenario.RISK_CONTEXT_CHANGE);
@@ -173,7 +173,7 @@ describe('PUT delta routing', () => {
     });
   });
 
-  describe('Scenario B — core field change', () => {
+  describe('Scenario B - core field change', () => {
     it('applies the edit and re-enqueues a full recompute in one write', async () => {
       const entry = await enrichedEntry();
       const { routing, entry: updated } = await service.update(String(entry._id), {
@@ -223,7 +223,7 @@ describe('PUT delta routing', () => {
     });
   });
 
-  describe('Scenario D — balance change, vectors untouched', () => {
+  describe('Scenario D - balance change, vectors untouched', () => {
     it('queues a partial re-evaluation and the vector document never moves', async () => {
       const entry = await enrichedEntry();
       const vectorsBefore = await EntryVectors.findById(entry._id).lean();
@@ -259,7 +259,7 @@ describe('PUT delta routing', () => {
     });
   });
 
-  describe('Scenario E — metadata only', () => {
+  describe('Scenario E - metadata only', () => {
     it('saves synchronously and never touches queue state or vectors', async () => {
       const entry = await enrichedEntry();
       const vectorsBefore = await EntryVectors.findById(entry._id).lean();

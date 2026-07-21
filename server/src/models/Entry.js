@@ -56,7 +56,7 @@ const ComplianceFlagSchema = new Schema(
 
 /**
  * The cheap half of the analytical layer, read on every list request. The
- * vector spaces live in their own collection — see EntryVectors.js.
+ * vector spaces live in their own collection - see EntryVectors.js.
  *
  * `enrichment` doubles as the job record: there is no separate queue.
  */
@@ -130,7 +130,7 @@ const AuditMetaSchema = new Schema(
 const EntrySchema = new Schema(
   {
     // Baseline ingested fields. These names and this structure are fixed by
-    // the specification — do not rename, nest, or add to this block.
+    // the specification - do not rename, nest, or add to this block.
     postingDate: { type: Date, required: true },
     transactionType: { type: String, required: true, default: 'Journal Entry' },
     entryNo: { type: String, required: true, trim: true },

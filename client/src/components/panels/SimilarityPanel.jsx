@@ -34,7 +34,7 @@ export class SimilarityPanel extends React.Component {
       if (this.state.strategy !== strategy) return;
       const message =
         error instanceof ApiError && error.status === 409
-          ? 'This entry has not been enriched yet — its vectors do not exist until the worker completes. Retry shortly.'
+          ? 'This entry has not been enriched yet - its vectors do not exist until the worker completes. Retry shortly.'
           : error.message;
       this.setState({ loading: false, results: null, error: message });
     }
@@ -61,7 +61,7 @@ export class SimilarityPanel extends React.Component {
 
         {loading && (
           <p className="text-secondary small mb-0">
-            <span className="spinner-border spinner-border-sm me-1" /> Scanning {strategy} space…
+            <span className="spinner-border spinner-border-sm me-1" /> Scanning {strategy} space...
           </p>
         )}
 
@@ -78,7 +78,7 @@ export class SimilarityPanel extends React.Component {
             <thead>
               <tr>
                 <th className="text-end">Similarity</th>
-                <th>Entry №</th>
+                <th>Entry No.</th>
                 <th>Name</th>
                 <th>Description</th>
                 <th className="text-end">Amount</th>

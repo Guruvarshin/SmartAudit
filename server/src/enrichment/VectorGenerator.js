@@ -5,7 +5,7 @@ import { CORE_FINANCIAL_FIELDS, VECTOR_DIMS } from '../domain/Constants.js';
  * Simulated multi-space embedding engine.
  *
  * Deterministic feature hashing rather than an RNG, because similar entries
- * must produce nearby vectors — random vectors would make similarity search a
+ * must produce nearby vectors - random vectors would make similarity search a
  * lottery regardless of how well-formed the endpoint was.
  *
  * Each space encodes a different notion of similarity: semantic from
@@ -104,7 +104,7 @@ export class VectorGenerator {
       const hash = this.#fnv1a(key);
       const index = hash % VECTOR_DIMS;
       // A hash bit supplies the sign so colliding features cancel rather than
-      // pile up — the standard hashing-trick construction.
+      // pile up - the standard hashing-trick construction.
       const sign = (hash >>> 8) & 1 ? 1 : -1;
       vector[index] += sign * value;
     }
