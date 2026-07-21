@@ -99,6 +99,16 @@ export const VECTOR_SPACES = Object.freeze([
 export const VECTOR_DIMS = 64;
 
 /**
+ * An internal approval limit. Amounts clustering just beneath it are the
+ * classic structuring pattern the rounding detector flags. Lives here — not in
+ * the seed's reference data — because Scenario D ("internal thresholds shift")
+ * mutates exactly this kind of value, and because the detector must never
+ * import seed data: reading the answer key is not detection. The seed imports
+ * *this* constant so planted data and detection stay aligned by construction.
+ */
+export const APPROVAL_THRESHOLD = 100000;
+
+/**
  * Current model versions. Scenario C migrates historical records from an older
  * version to these.
  */
@@ -107,6 +117,18 @@ export const ModelVersion = Object.freeze({
   ANOMALY: 'anomaly-v1',
   VECTOR: 'vec-v1',
   COMPLIANCE_RULESET: 'ifrs-ruleset-v1'
+});
+
+/**
+ * The versions those superseded. Exists so `npm run seed -- --enrich-historical`
+ * can stamp records as enriched by the previous model generation, giving the
+ * Scenario C migration genuinely stale data to page through.
+ */
+export const SupersededModelVersion = Object.freeze({
+  RISK: 'risk-v0',
+  ANOMALY: 'anomaly-v0',
+  VECTOR: 'vec-v0',
+  COMPLIANCE_RULESET: 'ifrs-ruleset-v0'
 });
 
 /**

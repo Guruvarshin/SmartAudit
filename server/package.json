@@ -8,10 +8,11 @@
     "start:server": "node src/server.js",
     "start:worker": "node src/worker/index.js",
     "migrate:models": "node src/scripts/migrateModels.js",
-    "test": "node --test test/**/*.test.js"
+    "test": "node --test"
   },
   "dependencies": {
     "dotenv": "^16.4.7",
+    "express": "^5.2.1",
     "mongoose": "^8.9.5"
   }
 }

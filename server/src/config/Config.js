@@ -19,7 +19,9 @@ export class Config {
     this.mongoUri = this.#required(env, 'MONGODB_URI');
     this.port = this.#int(env, 'PORT', 4000);
     this.workerPollIntervalMs = this.#int(env, 'WORKER_POLL_INTERVAL_MS', 1000);
-    this.workerBatchSize = this.#int(env, 'WORKER_BATCH_SIZE', 5);
+    this.workerConcurrency = this.#int(env, 'WORKER_CONCURRENCY', 4);
+    this.workerLeaseMs = this.#int(env, 'WORKER_LEASE_MS', 60000);
+    this.workerMaxAttempts = this.#int(env, 'WORKER_MAX_ATTEMPTS', 3);
     this.enrichmentDelayMs = this.#int(env, 'ENRICHMENT_DELAY_MS', 400);
     this.migrationBatchSize = this.#int(env, 'MIGRATION_BATCH_SIZE', 100);
     this.seedCount = this.#int(env, 'SEED_COUNT', 500);

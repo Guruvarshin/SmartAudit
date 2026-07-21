@@ -189,10 +189,11 @@ export const POSTING_USERS = Object.freeze([
 ]);
 
 /**
- * An internal approval limit. The near-threshold cohort clusters just beneath
- * it, which is the classic structuring pattern an audit system should surface.
+ * The internal approval limit the near-threshold cohort clusters beneath.
+ * Re-exported from the domain layer so the seed plants against the same value
+ * the detector inspects — they cannot drift apart.
  */
-export const APPROVAL_THRESHOLD = 100000;
+export { APPROVAL_THRESHOLD } from '../domain/Constants.js';
 
 export const Cohort = Object.freeze({
   CLEAN: 'clean',
