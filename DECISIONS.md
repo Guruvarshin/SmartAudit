@@ -1,24 +1,12 @@
 # Decision Log
 
-Maintained by Claude Code, one entry per architectural decision, appended at the end of each day/phase per `DAY_PLAN.md`. Read this file at the start of every session, right after `SPEC.md`, before writing any code.
+A record of the architectural decisions behind SmartAudit, written as the build progressed rather than reconstructed afterwards. Each entry states what was chosen, what the alternatives were, why the choice was made, and which files implement it — including the trade-offs knowingly accepted rather than only the parts that went well.
 
-Purpose: a fresh session (or a fresh subagent) should be able to read this file alone and know every non-obvious choice already made, without re-deriving it or contradicting it. If you're about to make a call that touches something already logged here, reconcile with the existing entry explicitly — don't silently override it.
+Entries are grouped by the phase they were made in: **Day 1** schema and domain design, **Day 2** class services and the worker pipeline, **Day 3** delta routing and the admin scripts, **Day 4** the UI and final verification. Reading them in order gives the actual sequence of reasoning, which matters in a few places where a later phase amends an earlier decision — where that happens it is called out explicitly rather than silently overwritten.
 
-> **Note for reviewers:** entries below cite `SPEC.md` by section (e.g. "SPEC.md §3.3", "Scenario B"). That file is the verbatim assessment brief you provided; it is deliberately not committed to this repository, so those citations point into the brief itself rather than to a file in the clone.
+Where an entry claims something was verified, the evidence sits alongside the claim: hashes, counts, timings, or the name of the test that covers it.
 
-Entry format:
-
-```
-## [Day N] <short decision title>
-
-**Decision:** what was chosen, stated concretely (not "used a good queue design" — say what the design actually is).
-
-**Alternatives considered:** what else was on the table.
-
-**Why this one:** the actual reasoning — tie it back to what the spec is testing where relevant (e.g., "Scenario D requires provably not touching vectors, which pushed toward X").
-
-**Affects:** which files/modules implement this, so a later phase knows where to look.
-```
+> **On `SPEC.md` citations:** entries below cite the assessment brief by section (e.g. "SPEC.md §3.3", "Scenario B"). That document is the brief itself and is not part of this repository, so those citations point into the brief rather than to a file in the clone.
 
 ---
 
@@ -99,7 +87,7 @@ Transactions are nonetheless *available, not depended upon*. Enrichment will wri
 
 **Why this one:** ESM is the natural fit for a codebase built on ES6 classes and native `import`, and Jest with ESM requires experimental VM flags or a Babel transform. Node's built-in runner removes that whole toolchain for what will be a small, targeted test suite. Fewer moving parts on a reviewer's machine is worth more here than Jest's richer matchers.
 
-**Note on `CLAUDE.md` constraint #1:** logic lives in classes (`Config`, `MongoConnection`, `EntryFactory`, `SeedRunner`, `SeededRandom`, `CliArguments`, and the Day 2+ controllers/services/repositories/workers). Mongoose **schema definitions**, the frozen vocabulary in `domain/Constants.js`, and the frozen reference data in `seed/LedgerReferenceData.js` are declarative data, not the "loose, procedural functional modules" the constraint forbids, so they are not wrapped in ceremonial classes. Flagged to the user at plan approval. *(Amended Day 2: the independent verification pass noted `LedgerReferenceData.js` was not literally named here despite being the same declarative character — now it is.)*
+**Note on the strict-OO constraint (ES6 classes, no loose procedural modules):** logic lives in classes (`Config`, `MongoConnection`, `EntryFactory`, `SeedRunner`, `SeededRandom`, `CliArguments`, and the Day 2+ controllers/services/repositories/workers). Mongoose **schema definitions**, the frozen vocabulary in `domain/Constants.js`, and the frozen reference data in `seed/LedgerReferenceData.js` are declarative data, not the "loose, procedural functional modules" the constraint forbids, so they are not wrapped in ceremonial classes. Flagged to the user at plan approval. *(Amended Day 2: the independent verification pass noted `LedgerReferenceData.js` was not literally named here despite being the same declarative character — now it is.)*
 
 **Affects:** `package.json`, `server/package.json`, every source file.
 
@@ -162,7 +150,7 @@ Transactions are nonetheless *available, not depended upon*. Enrichment will wri
 
 **Decision:** `UpdatePlanner` is the single place scenario detection lives. It classifies a PUT diff against a **closed** taxonomy defined in `domain/Constants.js` — `CORE_FINANCIAL_FIELDS` → Scenario B (full recompute enqueued, `reason: core_field_change`), `BALANCE_FIELDS` (`debit`/`credit`, new) → Scenario D (partial re-evaluation enqueued, `reason: context_shift`), `auditMeta.workflowStatus`/`comment` → Scenario E (synchronous, queue untouched) — and emits an immutable plan that `EntryRepository.applyUpdatePlan` executes as ONE `updateOne`: field `$set`s, auditMeta ops, and the re-enqueue flip together, filtered on `{ _id, updated: <at read> }` (optimistic CAS; one internal retry, then 409). Classification is diff-based: re-sending stored values is a no-op, which is what makes a double-clicked save free. Any other field — vendor `name`, `entryNo`, `currency`, every `analytics`/`_id` path — is a 400 naming the keys. Mixed updates take the strongest scenario (B ⊃ D; E's writes ride the same atomic update). The PUT response carries a `routing` block (`scenario`, `action`, `changedFields`) so the classification is API-observable, not inferred from logs.
 
-**Alternatives considered:** per-scenario conditionals in the service/controller (scatters the definition of "what a change means" and cannot guarantee a total classification); presence-based rather than diff-based detection (double-clicks would re-trigger recomputes); an open whitelist passing unclassified fields through (hollows out the routing claim); `debit`/`credit` as Scenario B members (leaves the PUT with no detectable D class at all, contradicting `DAY_PLAN.md`'s explicit B/D/E routing deliverable).
+**Alternatives considered:** per-scenario conditionals in the service/controller (scatters the definition of "what a change means" and cannot guarantee a total classification); presence-based rather than diff-based detection (double-clicks would re-trigger recomputes); an open whitelist passing unclassified fields through (hollows out the routing claim); `debit`/`credit` as Scenario B members (leaves the PUT with no detectable D class at all, contradicting this phase's explicit B/D/E routing deliverable).
 
 **Why debit/credit are the D route (user-confirmed at plan approval):** SPEC.md Scenario B enumerates its invalidation set exhaustively ("amount, description, glNumber, or postingDate"); a balance edit changes the `balance_mismatch` signal — risk and compliance must move — but per the spec's own list does not invalidate vectors. That is exactly Scenario D's premise. *Acknowledged tradeoff, accepted explicitly:* the financial vector's side/imbalance features do read `debit`/`credit`, so after a D update the stored financial vector reflects the pre-edit balance; the spec's exhaustive list, not the feature extractor, defines the invalidation contract. Consistent with Day 2's `sourceHash`, which hashes only the four core fields.
 
@@ -252,7 +240,7 @@ Also confirmed by the verifier, already known and scheduled: `npm run start:clie
 
 **Decision:** `client/` is a Vite + React 18 app in plain JS. Every component from `<App/>` down is a `React.Component` class — including small presentational pieces (`TierBadge`, `StaleBadge`, `VectorBars`). `main.jsx` holds the single non-class line in the codebase, the `createRoot(...).render(<App/>)` call, which has no component form. Bootstrap 5 is consumed as **CSS only**; `react-bootstrap` is deliberately not a dependency. Vite proxies `/api` to `VITE_API_BASE_URL`, so the browser is always same-origin with the dev server and the Express app needed no CORS middleware.
 
-**Alternatives considered:** `react-bootstrap` for the modal/table widgets (rejected: its components are internally function components using hooks — importing them would put hooks in the rendered tree, which is the exact thing `SPEC.md` §4 and `CLAUDE.md` constraint #2 prohibit; the constraint is about the UI being written with class components, and shipping a hook-based component library through the back door reads as evasion); Create React App (unmaintained, and `.env.example` already documented `VITE_API_BASE_URL`, fixing the intent); adding the `cors` package server-side (a second way to reach the API, and a production-shaped concern solved for a local dev convenience — the proxy is strictly narrower).
+**Alternatives considered:** `react-bootstrap` for the modal/table widgets (rejected: its components are internally function components using hooks — importing them would put hooks in the rendered tree, which is the exact thing `SPEC.md` §4 prohibits; the constraint is about the UI being written with class components, and shipping a hook-based component library through the back door reads as evasion); Create React App (unmaintained, and `.env.example` already documented `VITE_API_BASE_URL`, fixing the intent); adding the `cors` package server-side (a second way to reach the API, and a production-shaped concern solved for a local dev convenience — the proxy is strictly narrower).
 
 **Cost accepted:** hand-rolling modal markup and dropdown behaviour against Bootstrap's CSS classes. Small: the modal is `this.state`-controlled markup with a backdrop click and an Escape listener, which is less code than wiring Bootstrap's JS would have been.
 
@@ -335,7 +323,7 @@ The log image is a **syntax-highlighted rendering** of captured worker output, n
 
 **README structure:** quick start, `.env.example` walkthrough as a table, command table, demo media, API reference (including the error contract and the `routing` block), an architecture-decisions section distilled from this file, a scenario→implementation map, the verification results above, and an explicit known-trade-offs section (semantic tie-crowding, the D-route financial-vector staleness, no per-run job history, append-only comments, unpaginated list endpoint).
 
-**Links to `SPEC.md` were removed and reworded as prose:** `.gitignore` excludes `SPEC.md`/`CLAUDE.md`/`DAY_PLAN.md` from the deliverable, so a reviewer's clone would have hit a dead link. `DECISIONS.md` *is* tracked, so the README links to it freely.
+**Links to `SPEC.md` were removed and reworded as prose:** the assessment brief is not part of this repository, so a markdown link to it would have been a dead reference in a reviewer's clone. Section citations in prose are kept — they point into the brief the way a comment might cite a ticket. `DECISIONS.md` and `README.md` are both in the repository, so the README links to this file freely.
 
 **Affects:** `README.md`, `docs/media/*`.
 

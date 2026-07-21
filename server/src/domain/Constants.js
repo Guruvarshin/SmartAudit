@@ -3,8 +3,9 @@
  *
  * These are frozen value objects rather than classes because they carry no
  * behaviour — they are the enumerated vocabulary the schemas, worker, and
- * scripts all validate against. Everything with logic in this codebase is a
- * class (see CLAUDE.md constraint #1).
+ * scripts all validate against. The strict-OO requirement applies to anything
+ * carrying logic; declarative data like this is not wrapped in a ceremonial
+ * class.
  */
 
 /** Risk severity tiers. SPEC.md §3.1. */

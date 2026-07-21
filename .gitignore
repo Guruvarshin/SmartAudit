@@ -10,15 +10,9 @@ npm-debug.log*
 Thumbs.db
 .idea/
 .vscode/
-
-# Assessment scaffolding and agent workflow files.
-# Kept on disk (the build process reads them) but not part of the deliverable.
-CLAUDE.md
-SPEC.md
-DAY_PLAN.md
-STRATEGY.md
-PROMPT_SEQUENCE.md
-*.pdf
-
-# Agent tooling, not part of the deliverable.
 .claude/
+
+# The assessment brief, in either form. Reference material held locally,
+# never part of the deliverable.
+SPEC.md
+*.pdf
