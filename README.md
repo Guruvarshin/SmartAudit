@@ -107,6 +107,7 @@ Copy [`.env.example`](.env.example) to `.env`. Every variable the application re
 | `WORKER_LEASE_MS` | `60000` | Visibility timeout. A job still `processing` after this long is presumed orphaned by a crashed worker and becomes claimable again. |
 | `WORKER_MAX_ATTEMPTS` | `3` | Poison-job cutoff: after this many claims a job is parked as `failed` with `lastError`. |
 | `ENRICHMENT_DELAY_MS` | `400` | Simulated ML execution delay. **The spec mandates 400 ms for Scenario A.** |
+| `MONGO_TIMEOUT_MS` | `8000` | How long to wait for MongoDB before failing. Raise to `30000` against a hosted cluster. |
 | `MIGRATION_BATCH_SIZE` | `100` | Keyset page size for `migrate:models` / `reevaluate:risk`. Bounds memory during batch pagination. |
 | `RISK_MODEL_VERSION` | `risk-v1` | Current risk model stamp. Bump it, then run `migrate:models` — this is Scenario C's trigger. |
 | `ANOMALY_MODEL_VERSION` | `anomaly-v1` | Current anomaly model stamp. |
@@ -390,6 +391,7 @@ Required environment variables in the host's dashboard:
 |---|---|
 | `MONGODB_URI` | Your Atlas SRV connection string |
 | `RUN_WORKER_IN_PROCESS` | `true` |
+| `MONGO_TIMEOUT_MS` | `30000` — hosted clusters need longer than the local default |
 | `NODE_VERSION` | `20` (or higher) |
 
 `PORT` is supplied by the host and read automatically.

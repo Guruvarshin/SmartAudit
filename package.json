@@ -8,7 +8,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "setup": "npm install && npm --prefix server install && npm --prefix client install",
+    "setup": "npm install --include=dev && npm --prefix server install --include=dev && npm --prefix client install --include=dev",
     "seed": "npm --prefix server run seed --",
     "start:server": "npm --prefix server run start:server",
     "start:worker": "npm --prefix server run start:worker",

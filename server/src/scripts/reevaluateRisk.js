@@ -17,7 +17,9 @@ class ReEvaluateRiskCommand {
   constructor() {
     this.config = Config.load();
     this.args = new CliArguments();
-    this.connection = new MongoConnection(this.config.mongoUri);
+    this.connection = new MongoConnection(this.config.mongoUri, {
+      serverSelectionTimeoutMS: this.config.mongoServerSelectionTimeoutMs
+    });
   }
 
   async execute() {

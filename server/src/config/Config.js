@@ -12,6 +12,7 @@ export class Config {
   constructor(env = process.env) {
     this.mongoUri = this.#required(env, 'MONGODB_URI');
     this.port = this.#int(env, 'PORT', 4000);
+    this.mongoServerSelectionTimeoutMs = this.#int(env, 'MONGO_TIMEOUT_MS', 8000);
     this.workerPollIntervalMs = this.#int(env, 'WORKER_POLL_INTERVAL_MS', 1000);
     this.workerConcurrency = this.#int(env, 'WORKER_CONCURRENCY', 4);
     this.workerLeaseMs = this.#int(env, 'WORKER_LEASE_MS', 60000);

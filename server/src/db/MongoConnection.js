@@ -5,22 +5,24 @@ import mongoose from 'mongoose';
  * synchronisation and shutdown behave identically in each process.
  */
 export class MongoConnection {
-  constructor(uri, { logger = console } = {}) {
+  constructor(uri, { logger = console, serverSelectionTimeoutMS = 8000 } = {}) {
     this.uri = uri;
     this.logger = logger;
+    this.serverSelectionTimeoutMS = serverSelectionTimeoutMS;
     this.connection = null;
   }
 
   async connect() {
     if (this.connection) return this.connection;
 
-    // Fail fast rather than buffering for 30s: the usual cause is simply
-    // forgetting `docker compose up`, and a prompt error beats a retry.
+    // Fail fast rather than buffering for 30s: locally the usual cause is
+    // forgetting `docker compose up`, and a prompt error beats a retry. Hosted
+    // Mongo needs longer for DNS and TLS on a cold cluster, hence the override.
     mongoose.set('bufferCommands', false);
     mongoose.set('strictQuery', true);
 
     await mongoose.connect(this.uri, {
-      serverSelectionTimeoutMS: 8000,
+      serverSelectionTimeoutMS: this.serverSelectionTimeoutMS,
       maxPoolSize: 20
     });
 

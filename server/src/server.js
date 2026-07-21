@@ -15,7 +15,9 @@ import { WorkerFactory } from './worker/WorkerFactory.js';
 class ServerCommand {
   constructor() {
     this.config = Config.load();
-    this.connection = new MongoConnection(this.config.mongoUri);
+    this.connection = new MongoConnection(this.config.mongoUri, {
+      serverSelectionTimeoutMS: this.config.mongoServerSelectionTimeoutMs
+    });
     this.httpServer = null;
     this.worker = null;
   }
