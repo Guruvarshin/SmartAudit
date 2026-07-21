@@ -231,3 +231,15 @@ Transactions are nonetheless *available, not depended upon*. Enrichment will wri
 - **`.env.example` needed no Day 3 additions** — batch size was already `MIGRATION_BATCH_SIZE`, and the scripts take `--batch-size`/`--dry-run` flags.
 
 **Affects:** `server/src/controllers/EntryController.js`, `server/src/services/UpdatePlanner.js`, `server/src/services/SimilaritySearchService.js`.
+
+---
+
+## [Day 3] Independent verification pass: 5/5 PASS, one demo-relevant anomaly recorded
+
+An independent verification agent (fresh `SPEC.md` read, no session context) ran a 24-case PUT routing matrix, byte-for-byte vector-freeze checks (element-by-element over all 192 vector components, plus a SHA-256 sweep of the whole `entry_vectors` collection across a `reevaluate:risk` run), a `--batch-size=7` migration over 500 records (71×7+3 keyset pages, exactly-once, re-run no-op), a full-source grep confirming no executable `.skip()`, hand-recomputed cosines (diff ≤ 7.7e-6), and a cold-start run-surface audit. All five items passed; local `.env` was refreshed from the current `.env.example` (it was a stale copy — harmless, `Config` defaults matched, but now accurate).
+
+**Anomaly worth remembering for Day 4's demo (not a bug, deliberately not "fixed"):** under the `semantic` strategy, planted near-duplicate siblings can be crowded out of the top-5 by ties. The seed draws descriptions from a small template pool, so ~22 same-company entries share the exact normalized text "vendor invoice booked against purchase order" and all tie at cosine exactly 1.0; the fixed 5-slot table then keeps whichever ties arrive first in scan order. The siblings *score* joint-top — they just may not be *returned* when the query entry's description is boilerplate. This is the semantic space working as specified (identical text IS maximally semantically similar; distinguishing same-text entries by vendor is precisely the `entity` strategy's job, and entity does surface the true siblings). Re-ranking ties to favour seed-cluster members would be overfitting detection to the answer key — the same principle as the detector not importing `SUSPICIOUS_DESCRIPTIONS`. **Day 4 demo guidance:** pick a cluster whose descriptions are distinctive (or demo duplicates via the `entity` strategy) when recording the walkthrough.
+
+Also confirmed by the verifier, already known and scheduled: `npm run start:client` fails (no `client/` yet) and `README.md` does not exist — both are Day 4 deliverables; and the machine's unrelated `decideiq` container occupies port 3000, which will collide with `CLIENT_PORT=3000` on Day 4 (plan to stop it or change the port).
+
+**Affects:** `.env` (local only), Day 4 demo script.
