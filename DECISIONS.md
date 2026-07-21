@@ -100,3 +100,56 @@ Transactions are nonetheless *available, not depended upon*. Enrichment will wri
 **Note on `CLAUDE.md` constraint #1:** logic lives in classes (`Config`, `MongoConnection`, `EntryFactory`, `SeedRunner`, `SeededRandom`, `CliArguments`, and the Day 2+ controllers/services/repositories/workers). Mongoose **schema definitions** and the frozen vocabulary in `domain/Constants.js` are declarative data, not the "loose, procedural functional modules" the constraint forbids, so they are not wrapped in ceremonial classes. Flagged to the user at plan approval.
 
 **Affects:** `package.json`, `server/package.json`, every source file.
+
+---
+
+## [Day 2] Async architecture: MongoDB-native queue with no queue collection — the entry document is the job record
+
+**Decision:** No broker and no separate jobs collection. `analytics.enrichment` on the entry (`status`/`reason`/`attempts`/`claimedAt`/`completedAt`/`lastError`) *is* the queue state, served by Day 1's `claimable_jobs` partial index. Creating an entry and enqueueing its enrichment are one atomic insert — a new entry is born `pending`, the claimable state. Workers (`npm run start:worker`, N processes safe) run `WORKER_CONCURRENCY` poll-and-drain lanes, each claiming one job at a time via `EntryRepository.claimNextJob`.
+
+**Alternatives considered:**
+- *BullMQ + Redis.* Splits job truth across two stores with no arbiter (Redis says done, Mongo write failed); adds a second infrastructure dependency to a graded local run; and outsources the race-condition mechanism the spec names as a primary discussion point to a library, at a workload (400ms mock delay, hundreds of rows) orders of magnitude below where a broker pays rent.
+- *Separate `enrichment_jobs` collection in Mongo.* The serious contender. Rejected because job state is inherently 1:1 with an entry, and a second collection reintroduces exactly the cross-collection consistency problem (orphaned or missing job docs) Day 1's design avoids — with no transaction permitted to patch it.
+
+**Why this one:** one source of truth by construction; deduplication/coalescing for free — re-enqueue is an idempotent `$set` back to `pending`, so N rapid edits or double-clicked saves collapse into one recompute (Scenario B and the spec's Day 5-6 hardening example inherit this on Day 3); and the whole submission speaks the one language Scenarios C and D are already testing: targeted Mongo operators. Dispatch is poll-and-drain (sleep `WORKER_POLL_INTERVAL_MS` when empty) because change streams require a replica set and Day 1 committed to correctness on standalone `mongod`. **Cost accepted:** no per-run job history — only latest-attempt state plus `lastError`.
+
+**Affects:** `server/src/repositories/EntryRepository.js` (the queue), `server/src/worker/EnrichmentWorker.js` (the lanes), `server/src/services/EntryService.js` (insert-is-enqueue), `.env.example`.
+
+---
+
+## [Day 2] Race-condition mitigation: atomic claim + lease + fenced terminal writes
+
+**Decision:** three mechanisms, all in the repository layer:
+
+1. **Atomic claim** — one `findOneAndUpdate` filtering `status: pending ∨ (processing ∧ claimedAt < now − WORKER_LEASE_MS)`, setting `processing`/`claimedAt` and `$inc`-ing `attempts`. MongoDB's single-document atomicity makes double-claims impossible; racing claimants get different documents or `null`.
+2. **Lease (visibility timeout)** — the stale-claim clause is crash recovery: a dead worker's job re-enters the claimable pool after `WORKER_LEASE_MS`. Safe because every pipeline write is idempotent (vectors upsert by `_id`; analytics `$set`), honoring Day 1's ordering-not-transactions commitment: vectors first, then one fenced `$set` that lands analytics *and* flips status to `complete` — the commit point.
+3. **Fenced terminal writes** — complete/release/fail all filter on `{status: processing, claimedAt: mine, attempts: mine}`. A zombie that outlived its lease misses the filter and its write is discarded; `attempts` is the monotonic fencing token (`claimedAt` alone could only collide a full lease apart, which the attempts check closes anyway). Plus a poison-job cutoff: `attempts ≥ WORKER_MAX_ATTEMPTS` parks the entry as `failed` with `lastError`.
+
+**Alternatives considered:** transactions (ruled out Day 1); a `processing` flag without a lease (a crashed worker permanently strands its jobs); claim without fencing (a zombie whose job was reclaimed could clobber the rightful owner's result — the classic lost-update).
+
+**Verified, not asserted:** `server/test/claim.test.js` (40 concurrent claimants over 20 jobs → pairwise-disjoint, every `attempts === 1`; zombie's complete/release/fail all rejected; rightful owner commits). Live demos: two 4-lane worker processes drained 500 seeded jobs — A=252 + B=248, zero overlap, `attempts: 1=500`; a hard-killed worker's 4 orphaned claims were reclaimed at `attempt=2` after lease expiry and completed by a second worker.
+
+**Affects:** `server/src/repositories/EntryRepository.js`, `server/src/worker/EnrichmentWorker.js`, `server/test/claim.test.js`.
+
+---
+
+## [Day 2] Deterministic feature-hashed vectors; detection measured against robust per-account baselines
+
+**Decision:** `VectorGenerator` uses the feature-hashing trick (FNV-1a into 64 dims, hash-bit sign), no RNG: semantic = description tokens + character trigrams; financial = magnitude/roundness/side/imbalance/timing features; entity = vendor/GL/poster/tenant features. The numeric-outlier detector measures log-amounts against a **median + MAD** baseline per `(companyId, glNumber)` (30s in-process cache) rather than mean/stddev. Anomaly heuristics live in the detector and import nothing from the seed — the planted-vs-detected comparison is only meaningful if the detector cannot read the answer key. `APPROVAL_THRESHOLD` moved to `domain/Constants.js` (it is Scenario D's kind of mutable context), re-exported to the seed so plant and detection cannot drift.
+
+**Alternatives considered:** random vectors (deterministic per entry only if seeded by id — and then similarity search is a lottery: near-duplicates would land nowhere near each other, making Day 3's endpoint undemonstrable); mean/stddev outlier baseline (the 50-200× planted outliers inflate the spread they're measured against and mask themselves).
+
+**Verified:** drain of the 500-entry seed detected `balance_mismatch` 40/40, `temporal` 48/48, `semantic` 25/25 exactly; `rounding` 27 vs 25 planted (two organic round-figure hits); `numeric_outlier` 47 vs 30 planted — the excess is the rounding cohort's 250k-2M amounts posted to small-range GL accounts, which genuinely are outliers there (multi-signal entries, by design). The spec's canonical POST (unbalanced + 2AM Sunday + "misc adjustment" + 1500 under threshold) scored 1.0/high/fail with all four factors itemised.
+
+**Affects:** `server/src/enrichment/*`, `server/src/domain/Constants.js`, `server/src/seed/LedgerReferenceData.js`.
+
+---
+
+## [Day 2] Smaller calls, recorded so later phases don't relitigate them
+
+- **GET `/api/entries` and GET `/api/entries/:id` are additive conveniences** for verification and the Day 4 dashboard. The spec fixes only `POST /api/entries`, `PUT /api/entries/:id`, and `POST /api/entries/search/similar`; it does not mandate the GETs. Confirmed with the user at Day 2 plan approval.
+- **Queue bookkeeping does not bump `updated`.** Claim/release/fail write with `timestamps: false` — a claim is not a record edit, and the spec's `updated` field should reflect content changes, not worker churn. Completion (which lands new analytics) does bump it.
+- **`--enrich-historical` runs the real `EnrichmentService`** (Day 1's debt, paid): same engines, superseded version stamps (`risk-v0`/`vec-v0` via `SupersededModelVersion`), no simulated delay, `timestamps: false` so months-old `created`/`updated` survive. Verified: 500/500 stamped v0 with historical timestamps intact. This is the Scenario C fixture.
+- **Body-shaping is whitelist-only** (`EntryService.#pickCreatable`): a client cannot write `analytics`, `auditMeta`, or `_id` through `POST /api/entries` because unknown keys are never copied, not because they are stripped.
+
+**Affects:** `server/src/routers/EntryRouter.js`, `server/src/repositories/EntryRepository.js`, `server/src/seed/SeedRunner.js`, `server/src/services/EntryService.js`.
