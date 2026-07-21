@@ -9,6 +9,8 @@ import { SeedRunner } from './SeedRunner.js';
  *   npm run seed
  *   npm run seed -- --count=1200
  *   npm run seed -- --count=500 --seed=99
+ *   npm run seed -- --enrich-historical   # backfill at superseded model
+ *                                         # versions (Scenario C fixture)
  *
  * Thin by design: it wires configuration to the connection and the runner, and
  * owns nothing else.
@@ -23,10 +25,11 @@ class SeedCommand {
   async execute() {
     const count = this.args.int('count', this.config.seedCount);
     const seed = this.args.int('seed', this.config.seedRandomSeed);
+    const enrichHistorical = this.args.bool('enrich-historical');
 
     await this.connection.connect();
     try {
-      const runner = new SeedRunner({ count, seed });
+      const runner = new SeedRunner({ count, seed, enrichHistorical });
       await runner.run();
       console.log('[seed] done');
     } finally {

@@ -1,5 +1,9 @@
+import { SupersededModelVersion } from '../domain/Constants.js';
+import { EnrichmentService } from '../enrichment/EnrichmentService.js';
 import { Entry } from '../models/Entry.js';
 import { EntryVectors } from '../models/EntryVectors.js';
+import { EntryRepository } from '../repositories/EntryRepository.js';
+import { EntryVectorsRepository } from '../repositories/EntryVectorsRepository.js';
 import { EntryFactory } from './EntryFactory.js';
 import { COMPANIES } from './LedgerReferenceData.js';
 
@@ -15,9 +19,10 @@ const INSERT_CHUNK_SIZE = 250;
  * compared against.
  */
 export class SeedRunner {
-  constructor({ count, seed, logger = console }) {
+  constructor({ count, seed, enrichHistorical = false, logger = console }) {
     this.count = count;
     this.seed = seed;
+    this.enrichHistorical = enrichHistorical;
     this.logger = logger;
   }
 
@@ -31,9 +36,58 @@ export class SeedRunner {
     const { documents, tags } = factory.build();
 
     await this.#insert(documents);
+    if (this.enrichHistorical) await this.#enrichHistorical();
     await this.#report(documents, tags);
 
     return { inserted: documents.length };
+  }
+
+  /**
+   * --enrich-historical: backfills every seeded entry through the REAL
+   * enrichment service, stamped at the superseded model versions (v0), as if
+   * a previous model generation had processed the ledger long ago. This is
+   * what gives the Scenario C migration genuinely stale records to page
+   * through — and it is deliberately not a second implementation of
+   * enrichment, just the one service invoked with different version stamps
+   * (and without the per-entry simulated model delay, which exists to
+   * demonstrate Scenario A's asynchrony, not to slow seeding by 400ms x N).
+   */
+  async #enrichHistorical() {
+    const entryRepository = new EntryRepository();
+    const service = new EnrichmentService({
+      entryRepository,
+      entryVectorsRepository: new EntryVectorsRepository(),
+      delayMs: 0
+    });
+    const versions = {
+      risk: SupersededModelVersion.RISK,
+      anomaly: SupersededModelVersion.ANOMALY,
+      vector: SupersededModelVersion.VECTOR,
+      complianceRuleset: SupersededModelVersion.COMPLIANCE_RULESET
+    };
+
+    this.logger.log(
+      `[seed] enriching historical records at superseded model versions (${versions.risk}, ${versions.vector})`
+    );
+
+    let enriched = 0;
+    // Keyset walk in _id order — same discipline the Scenario C migration will
+    // use: no skip(), no unbounded cursor held across slow work.
+    let lastId = null;
+    for (;;) {
+      const batch = await Entry.find(lastId ? { _id: { $gt: lastId } } : {})
+        .sort({ _id: 1 })
+        .limit(100)
+        .lean();
+      if (batch.length === 0) break;
+
+      for (const entry of batch) {
+        await service.enrichDirect(entry, { versions });
+        enriched += 1;
+      }
+      lastId = batch[batch.length - 1]._id;
+      this.logger.log(`[seed]   enriched ${enriched}/${this.count}`);
+    }
   }
 
   /**
@@ -110,7 +164,11 @@ export class SeedRunner {
     this.logger.log('  ' + '-'.repeat(46));
     this.logger.log(`  entries in database        ${entryCount}`);
     this.logger.log(`  awaiting enrichment        ${pendingCount}`);
-    this.logger.log(`  vector documents           ${vectorCount}  (expected 0 until the worker runs)`);
+    this.logger.log(
+      this.enrichHistorical
+        ? `  vector documents           ${vectorCount}  (historical, stamped at superseded model versions)`
+        : `  vector documents           ${vectorCount}  (expected 0 until the worker runs)`
+    );
     this.logger.log(`  posting date range         ${oldest} .. ${newest}`);
     for (const company of COMPANIES) {
       const n = await Entry.countDocuments({ companyId: company._id });
