@@ -6,10 +6,8 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, '..', '..', '..');
 
 /**
- * Typed, validated access to environment configuration.
- *
  * Reads the repo-root .env once and fails loudly on a missing required value
- * rather than letting `undefined` propagate into a connection string.
+ * rather than letting `undefined` reach a connection string.
  */
 export class Config {
   /** @type {Config | null} */
@@ -30,8 +28,8 @@ export class Config {
   }
 
   /**
-   * Loads .env from the repo root (the server runs from server/, the scripts
-   * from anywhere) and returns a shared instance.
+   * Loads .env from the repo root — the server runs from server/ and the
+   * scripts from anywhere, so the path cannot be relative to cwd.
    */
   static load() {
     if (!Config.#instance) {

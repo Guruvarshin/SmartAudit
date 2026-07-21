@@ -2,11 +2,7 @@ import mongoose from 'mongoose';
 import { UpdateScenario } from '../domain/Constants.js';
 import { HttpError } from '../http/HttpError.js';
 
-/**
- * The spec's §2 baseline fields a client may supply on creation. `_id`,
- * `created`, `updated` are system-assigned; everything analytical is
- * system-computed and not writable through this door at all.
- */
+/** Baseline fields a client may supply; everything else is system-assigned. */
 const CREATABLE_FIELDS = Object.freeze([
   'postingDate',
   'transactionType',
@@ -27,10 +23,6 @@ const CREATABLE_FIELDS = Object.freeze([
   'uploadSourceType'
 ]);
 
-/**
- * Application logic for journal entries. Controllers translate HTTP; this
- * class decides what a valid operation is; repositories talk to MongoDB.
- */
 export class EntryService {
   constructor({ entryRepository, updatePlanner }) {
     this.entryRepository = entryRepository;
@@ -38,11 +30,9 @@ export class EntryService {
   }
 
   /**
-   * Scenario A entry point. Persists the baseline record — which, because a
-   * new entry is born at enrichment.status 'pending' (the claimable state),
-   * is *also* the enqueue: one write, no separate queue insertion, no window
-   * where an entry exists but its enrichment job does not. The API returns
-   * immediately; a worker picks the job up asynchronously.
+   * A new entry is born `pending`, the claimable state, so persisting it is
+   * also the enqueue — there is no window where an entry exists but its
+   * enrichment job does not.
    */
   async create(payload) {
     const fields = this.#pickCreatable(payload);
@@ -62,16 +52,9 @@ export class EntryService {
   }
 
   /**
-   * PUT /api/entries/:id — the delta-routed update (Scenarios B / D / E).
-   *
-   * Flow: fresh read → UpdatePlanner classifies the diff → one atomic
-   * CAS-guarded write executes the whole plan. A CAS miss means a concurrent
-   * content write landed between our read and write; we re-plan once from a
-   * fresh read (the second attempt usually discovers the "conflict" was an
-   * identical double-click and diffs to a no-op), then give up with 409.
-   *
-   * Returns { routing, entry } — the routing block states which scenario was
-   * detected and what was done, so the demo shows the decision explicitly.
+   * Fresh read → classify the diff → one CAS-guarded write. A CAS miss means
+   * a concurrent content write landed in between, so we re-plan once from a
+   * fresh read before giving up with 409.
    */
   async update(id, payload) {
     const entryId = this.#objectId(id);
@@ -119,10 +102,7 @@ export class EntryService {
     });
   }
 
-  /**
-   * Whitelist, not blacklist: unknown keys — including any attempt to write
-   * `analytics`, `auditMeta`, or a forged `_id` — are simply never copied.
-   */
+  /** Whitelist, not blacklist: unknown keys are never copied rather than stripped. */
   #pickCreatable(payload) {
     if (payload === null || typeof payload !== 'object' || Array.isArray(payload)) {
       throw HttpError.badRequest('request body must be a JSON object');

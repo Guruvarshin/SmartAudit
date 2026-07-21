@@ -2,24 +2,17 @@ import mongoose from 'mongoose';
 import { ModelVersion, VECTOR_SPACES } from '../domain/Constants.js';
 import { HttpError } from '../http/HttpError.js';
 
-/** SPEC.md §3.3 fixes the result size: "the top 5 closest matching transactions". */
+/** Fixed by the spec: "the top 5 closest matching transactions". */
 const TOP_K = 5;
 
 /**
- * POST /api/entries/search/similar — cosine top-5 in one of the three vector
- * spaces. One implementation serves all three strategies: the strategy only
- * selects which stored array (and precomputed norm) participates.
+ * Cosine top-5 in one of the three vector spaces, as a tenant-scoped
+ * streaming scan. The strategy only selects which stored array and norm
+ * participate, so all three share one implementation.
  *
- * Computation is an application-side streaming scan over the tenant's
- * `entry_vectors`, projected down to ONE space per candidate (a third of the
- * document), with cosine reduced to dot ÷ (two stored norms) — the reason the
- * norms were precomputed at enrichment time. Memory is bounded by the cursor
- * batch plus a fixed 5-slot result table; nothing accumulates with collection
- * size. At this scale that beats the alternatives on their own terms:
- * aggregation-pipeline dot products ($zip/$reduce) cannot keep a running
- * top-k and are unreadable, and $vectorSearch requires Atlas while Day 1
- * committed to local-Docker parity. `entry_vectors` remains the documented
- * seam where a real vector store would replace this scan wholesale.
+ * Cosine reduces to dot ÷ (two stored norms) because the norms are computed
+ * at enrichment time. Memory stays bounded by the cursor batch plus a fixed
+ * 5-slot table, regardless of collection size.
  */
 export class SimilaritySearchService {
   constructor({ entryRepository, entryVectorsRepository }) {
@@ -27,10 +20,6 @@ export class SimilaritySearchService {
     this.entryVectorsRepository = entryVectorsRepository;
   }
 
-  /**
-   * @param {{ entryId?: string, strategy?: string }} body
-   * @returns {Promise<{ entryId: string, strategy: string, results: object[] }>}
-   */
   async search(body) {
     const { entryId, strategy } = this.#validate(body);
 
@@ -48,8 +37,7 @@ export class SimilaritySearchService {
     const queryArray = queryVectors[strategy];
     const queryNorm = queryVectors.norms[strategy];
     if (!queryNorm) {
-      // A zero vector (e.g. an empty description's semantic space) is similar
-      // to nothing; degenerate input, not an error.
+      // A zero vector is similar to nothing — degenerate input, not an error.
       return { entryId: String(entryId), strategy, results: [] };
     }
 
@@ -61,16 +49,15 @@ export class SimilaritySearchService {
     };
   }
 
-  /** Streams the tenant's vectors, keeping a fixed-size top-K table. */
   async #scan(companyId, selfId, strategy, queryArray, queryNorm) {
-    const top = []; // ascending insertion into ≤5 slots; a heap is ceremony at k=5
+    const top = []; // insertion into ≤5 slots; a heap is ceremony at k=5
     const cursor = this.entryVectorsRepository.streamCompanySpace(companyId, strategy);
 
     for await (const candidate of cursor) {
       if (String(candidate._id) === String(selfId)) continue;
 
       const norm = candidate.norms?.[strategy];
-      if (!norm) continue; // zero vector: similar to nothing, skip
+      if (!norm) continue;
 
       const similarity = this.#dot(queryArray, candidate[strategy]) / (queryNorm * norm);
       if (top.length === TOP_K && similarity <= top[TOP_K - 1].similarity) continue;
@@ -86,7 +73,6 @@ export class SimilaritySearchService {
     return top;
   }
 
-  /** One $in fetch for the winners, re-ordered by similarity. */
   async #hydrate(top) {
     const entries = await this.entryRepository.findByIds(top.map((hit) => hit.entryId));
     const byId = new Map(entries.map((entry) => [String(entry._id), entry]));
@@ -94,8 +80,8 @@ export class SimilaritySearchService {
     return top.map((hit) => ({
       entryId: String(hit.entryId),
       similarity: Math.round(hit.similarity * 10000) / 10000,
-      // Surfaced so a pre-migration (Scenario C) candidate is visibly stale
-      // rather than silently comparable.
+      // Surfaced so a pre-migration candidate is visibly stale rather than
+      // silently comparable.
       stale: hit.modelVersion !== ModelVersion.VECTOR,
       entry: byId.get(String(hit.entryId)) ?? null
     }));

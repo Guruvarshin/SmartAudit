@@ -18,12 +18,8 @@ function emptyDraft() {
 }
 
 /**
- * Scenario A's front door: POST /api/entries. The response lands in the list
- * immediately at enrichment.status 'pending', and the dashboard's fast poll
- * then shows the worker claim → complete transition live.
- *
- * Save guard: the submit button disables while the request is in flight —
- * the same double-click discipline as the modal's edit form.
+ * The new entry lands in the list immediately as 'pending', so the dashboard's
+ * fast poll shows the worker's claim-to-complete transition live.
  */
 export class NewEntryForm extends React.Component {
   constructor(props) {
@@ -50,9 +46,9 @@ export class NewEntryForm extends React.Component {
   }
 
   /**
-   * Pre-fills the spec's canonical high-risk shape: unbalanced sides, posted
-   * 02:00 on a Sunday, vague description, amount just under the approval
-   * threshold — every risk factor at once, for the demo.
+   * Pre-fills an entry that trips every risk factor at once: unbalanced,
+   * posted 02:00 on a Sunday, vague narrative, amount just under the approval
+   * threshold.
    */
   handleFillRisky() {
     const sunday = new Date();

@@ -1,4 +1,3 @@
-/** Presentation formatting, kept in one place so the table and modal agree. */
 export class Format {
   static money(value, currency) {
     if (value === null || value === undefined) return '—';

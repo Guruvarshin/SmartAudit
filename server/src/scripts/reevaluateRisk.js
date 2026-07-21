@@ -6,17 +6,11 @@ import { CliArguments } from '../util/CliArguments.js';
 import { RiskReEvaluationService } from './RiskReEvaluationService.js';
 
 /**
- * Entry point for `npm run reevaluate:risk` — SPEC.md Scenario D's partial
- * evaluation script. Run it after shifting RiskThresholds or
- * APPROVAL_THRESHOLD in domain/Constants.js; it re-scores every settled entry
- * under the new context via targeted $set operators, leaving the vector
- * collection entirely untouched.
+ * Entry point for `npm run reevaluate:risk`. Run after shifting
+ * RiskThresholds or APPROVAL_THRESHOLD in domain/Constants.js. Accepts
+ * --dry-run and --batch-size.
  *
- *   npm run reevaluate:risk
- *   npm run reevaluate:risk -- --dry-run
- *   npm run reevaluate:risk -- --batch-size=50
- *
- * Note what is NOT imported here: EntryVectorsRepository. This process holds
+ * Note what is not imported here: EntryVectorsRepository. This process holds
  * no handle to the vectors collection at all.
  */
 class ReEvaluateRiskCommand {

@@ -1,7 +1,7 @@
 import React from 'react';
 import { ApiError } from '../../api/ApiClient.js';
 
-/** datetime-local string (browser-local) for an ISO date, for editing + dirty comparison. */
+/** ISO date → datetime-local string, for editing and dirty comparison. */
 function toLocalInput(value) {
   if (!value) return '';
   const date = new Date(value);
@@ -21,18 +21,14 @@ function draftFromEntry(entry) {
 }
 
 /**
- * The PUT surface for the ledger's editable fields, built around the backend's
- * Day 2/3 concurrency contract rather than around optimism:
+ * Built around the backend's concurrency contract rather than around optimism:
  *
- * - Dirty-fields-only: the form diffs against the entry snapshot and sends
- *   only changed keys — matching the UpdatePlanner's diff-based
- *   classification, and leaving `routing.changedFields` meaning something.
- * - Disable-while-saving: the spec's "sequential double-clicks" case. Pure
- *   UX suppression; even a click that slipped through is harmless because the
- *   backend diffs a re-send to no_op and coalesces re-enqueues.
- * - 409 = reload, never blind retry: a CAS conflict means someone else's
- *   content write landed first. The server is the arbiter — we refetch, reset
- *   the form to server truth, and let the auditor consciously re-apply.
+ * - Sends only changed keys, matching the planner's diff-based classification
+ *   and keeping routing.changedFields meaningful.
+ * - Disables while saving. This is UX suppression only — a click that slips
+ *   through is harmless, because the backend diffs a re-send to a no-op.
+ * - Treats 409 as reload, never blind retry: the server is the arbiter, so we
+ *   refetch and let the auditor consciously re-apply.
  */
 export class EditEntryForm extends React.Component {
   constructor(props) {
@@ -94,7 +90,7 @@ export class EditEntryForm extends React.Component {
       this.props.onSaved(routing, entry);
     } catch (error) {
       if (error instanceof ApiError && error.status === 409) {
-        // CAS conflict: reload server truth, surface it, let the user re-apply.
+        // Reload server truth and let the user re-apply.
         try {
           const fresh = await this.props.apiClient.getEntry(this.props.entry._id);
           this.setState({

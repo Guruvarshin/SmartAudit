@@ -9,11 +9,7 @@ import { SimilaritySearchService } from '../services/SimilaritySearchService.js'
 import { UpdatePlanner } from '../services/UpdatePlanner.js';
 import { VectorDiagnosticsService } from '../services/VectorDiagnosticsService.js';
 
-/**
- * Composition root for the HTTP application. Wires repository → service →
- * controller → router, mounts middleware, and owns the express instance.
- * server.js (the bin) handles process concerns; this class handles the app.
- */
+/** Composition root: wires repository → service → controller → router. */
 export class App {
   constructor({ logger = console } = {}) {
     this.logger = logger;

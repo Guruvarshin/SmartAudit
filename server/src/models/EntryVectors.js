@@ -4,80 +4,57 @@ import { Collections, VECTOR_DIMS } from '../domain/Constants.js';
 const { Schema } = mongoose;
 
 /**
- * The expensive half of the analytical layer, deliberately held in its own
- * collection rather than embedded on the entry.
+ * The expensive half of the analytical layer, held in its own collection
+ * rather than embedded on the entry.
  *
- * Why this is separate (see DECISIONS.md, Day 1):
- *
- *  1. Scenario D requires that a risk/compliance update leave the vectors
- *     "entirely untouched". With the vectors in a different collection that is
- *     a structural guarantee, not a coding convention someone has to remember —
- *     the risk-update path holds no handle to this model at all, so no `$set`
- *     can reach these fields even by accident.
- *  2. Read patterns diverge sharply. Vectors are consumed by exactly two
- *     things: the similarity endpoint and the diagnostics modal. The dashboard
- *     list — the hot path — never wants them, and embedding would drag ~1.5KB
- *     of doubles per row through every query that forgot to project them out.
- *  3. WiredTiger rewrites a whole document on any update, including a targeted
- *     `$set`. Scenario D is a bulk re-scoring pass; rewriting ~400-byte entry
- *     documents instead of ~2KB ones is the substance behind the spec's
- *     "avoid entire root document rewrites".
- *  4. This collection is the seam where a real vector store (Atlas Vector
- *     Search, pgvector, Pinecone) would later drop in without the ledger
- *     schema changing at all.
+ * Separating it makes "a risk update leaves vectors untouched" a structural
+ * fact rather than a convention: the risk-update path holds no handle to this
+ * model, so no $set can reach these fields even by accident. It also keeps
+ * ~1.5KB of doubles per row off the dashboard's hot path, and leaves a clean
+ * seam for a real vector store to drop in later.
  */
 const EntryVectorsSchema = new Schema(
   {
-    // Deliberately the *same* ObjectId as the entry it describes. The 1:1
-    // relationship is then enforced by the primary key itself — duplicates are
-    // impossible and the join is a primary-key hit, needing no extra index.
+    // The same ObjectId as the entry it describes, so the 1:1 relationship is
+    // enforced by the primary key and the join is a PK hit.
     _id: { type: Schema.Types.ObjectId, required: true },
 
-    // Denormalised so a similarity scan can be scoped to a single tenant
-    // without joining back to the entries collection.
+    // Denormalised so a similarity scan can be tenant-scoped without a join.
     companyId: { type: Schema.Types.ObjectId, required: true },
 
-    // The three vector spaces required by SPEC.md §3.3.
     semantic: { type: [Number], required: true },
     financial: { type: [Number], required: true },
     entity: { type: [Number], required: true },
 
     dims: { type: Number, required: true, default: VECTOR_DIMS },
 
-    // Precomputed L2 norms. Cosine similarity then reduces to a dot product
-    // divided by the product of two stored scalars, so the per-candidate cost
-    // during a search scan is one pass instead of three.
+    // Precomputed so cosine reduces to a dot product over two stored scalars.
     norms: {
       semantic: { type: Number, required: true },
       financial: { type: Number, required: true },
       entity: { type: Number, required: true }
     },
 
-    // Hash of the core entry fields these vectors were derived from. Makes
-    // Scenario B concrete: edit `amount`, the hash changes, and the vectors are
-    // demonstrably — not just presumably — recomputed.
+    // Hash of the core fields these vectors were derived from.
     sourceHash: { type: String, required: true },
 
-    // Scenario C migrates this from one version to the next.
     modelVersion: { type: String, required: true }
   },
   {
     collection: Collections.ENTRY_VECTORS,
-    // `updated` is the witness for Scenario D: if a risk-only update ever
-    // touched this document, this timestamp would move. It must not.
+    // `updated` is the witness that a risk-only update did not touch this
+    // document: it must not move during one.
     timestamps: { createdAt: 'computedAt', updatedAt: 'updated' },
     strict: true,
     minimize: false,
     versionKey: false,
-    _id: false // supplied explicitly from the entry's _id, never generated
+    _id: false // supplied from the entry's _id, never generated
   }
 );
 
-// Scenario C: keyset pagination over vectors stamped at a superseded model
-// version — the migration pages on _id within a fixed modelVersion.
+// Keyset pagination for the model migration.
 EntryVectorsSchema.index({ modelVersion: 1, _id: 1 }, { name: 'vector_model_version_scan' });
 
-// Tenant-scoped similarity scans.
 EntryVectorsSchema.index({ companyId: 1 }, { name: 'company_vectors' });
 
 export const EntryVectors = mongoose.model('EntryVectors', EntryVectorsSchema);

@@ -10,23 +10,15 @@ import {
 import { HttpError } from '../http/HttpError.js';
 
 /**
- * The single place scenario detection lives. Given the current entry and a
- * PUT payload, produces an immutable update plan: which scenario applies,
- * which paths to $set / $push, and whether (and why) to re-enqueue
- * enrichment. Controller, service, and repository consume the plan; nothing
- * else in the codebase decides what a change "means".
+ * Turns a PUT payload into an update plan: which scenario applies, what to
+ * $set/$push, and whether to re-enqueue enrichment.
  *
- * Classification is diff-based, not presence-based: a field counts as changed
- * only when its normalised value differs from the stored one. Re-sending the
- * current amount is a no-op, not a Scenario B trigger — which is what makes a
- * double-clicked save free: the second request diffs to nothing and never
- * touches the queue.
+ * Classification is diff-based, not presence-based — a field counts as changed
+ * only when its value differs from the stored one, which is what makes a
+ * double-clicked save free.
  *
- * The accepted field set is deliberately CLOSED. Every field the PUT accepts
- * belongs to exactly one scenario class (core → B, balance → D,
- * auditMeta → E); anything else — including vendor identity, entryNo,
- * currency, and every analytics/_id path — is rejected with a 400 naming the
- * offending keys. An open whitelist would make the routing claim hollow.
+ * The accepted field set is closed: every field maps to exactly one scenario
+ * (core → B, balance → D, auditMeta → E) and anything else is a 400.
  */
 export class UpdatePlanner {
   static #ALLOWED_TOP_LEVEL = new Set([
@@ -47,18 +39,6 @@ export class UpdatePlanner {
     [UpdateScenario.NO_OP]: 'no effective change — nothing written, nothing queued'
   });
 
-  /**
-   * @param {object} entry the current (lean) entry document
-   * @param {object} payload the PUT request body
-   * @returns {{
-   *   scenario: string,
-   *   routing: { scenario: string, action: string, changedFields: string[] },
-   *   baselineSet: object,
-   *   auditMetaSet: object,
-   *   commentPush: object | null,
-   *   enqueue: { reason: string } | null
-   * }}
-   */
   plan(entry, payload) {
     if (payload === null || typeof payload !== 'object' || Array.isArray(payload)) {
       throw HttpError.badRequest('request body must be a JSON object');
@@ -99,13 +79,9 @@ export class UpdatePlanner {
   }
 
   /**
-   * B queues a full recompute. D queues a partial one — UNLESS the entry is
-   * already queued (or mid-run) for a full-pipeline reason, in which case that
-   * reason is preserved: the owed full recompute subsumes the partial, and a
-   * downgrade would silently drop the vector refresh the entry still needs.
-   * Decided from the CAS-protected snapshot, so no read-modify-write race:
-   * if the snapshot is stale the CAS in the repository misses and the service
-   * re-plans.
+   * A partial (D) enqueue never overwrites an in-flight full recompute: the
+   * owed full run subsumes it, and downgrading would drop the vector refresh
+   * the entry still needs.
    */
   #enqueueFor(scenario, entry) {
     if (scenario === UpdateScenario.CORE_FIELD_CHANGE) {
@@ -155,7 +131,6 @@ export class UpdatePlanner {
     }
   }
 
-  /** Diffs the payload against the entry for one field group. */
   #diffBaseline(entry, payload, fieldGroup) {
     const set = {};
     const fields = [];
@@ -200,10 +175,7 @@ export class UpdatePlanner {
     return stored === normalised;
   }
 
-  /**
-   * auditMeta ops. workflowStatus is diff-based like everything else; a
-   * comment is inherently an append, so its presence alone is a change.
-   */
+  /** A comment is inherently an append, so its presence alone counts as a change. */
   #planAuditMeta(entry, payload) {
     const auditMetaSet = {};
     let commentPush = null;

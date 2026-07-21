@@ -4,16 +4,9 @@ import { CliArguments } from '../util/CliArguments.js';
 import { SeedRunner } from './SeedRunner.js';
 
 /**
- * Entry point for `npm run seed`.
- *
- *   npm run seed
- *   npm run seed -- --count=1200
- *   npm run seed -- --count=500 --seed=99
- *   npm run seed -- --enrich-historical   # backfill at superseded model
- *                                         # versions (Scenario C fixture)
- *
- * Thin by design: it wires configuration to the connection and the runner, and
- * owns nothing else.
+ * Entry point for `npm run seed`. Accepts --count, --seed, and
+ * --enrich-historical (backfills at superseded model versions, giving the
+ * migration stale records to work on).
  */
 class SeedCommand {
   constructor() {

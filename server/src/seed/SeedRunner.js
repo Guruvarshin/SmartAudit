@@ -10,12 +10,8 @@ import { COMPANIES } from './LedgerReferenceData.js';
 const INSERT_CHUNK_SIZE = 250;
 
 /**
- * Orchestrates database seeding: clears prior seed data, rebuilds indexes,
- * inserts a generated ledger, and reports what was planted.
- *
- * The report is not decoration. The whole purpose of the seed is to give the
- * enrichment pipeline real signal to find, so the run prints exactly what
- * signal it planted — that number is what Day 2's detection output gets
+ * Clears prior seed data, rebuilds indexes, inserts a generated ledger, and
+ * reports what was planted — that report is what detection output gets
  * compared against.
  */
 export class SeedRunner {
@@ -43,14 +39,10 @@ export class SeedRunner {
   }
 
   /**
-   * --enrich-historical: backfills every seeded entry through the REAL
-   * enrichment service, stamped at the superseded model versions (v0), as if
-   * a previous model generation had processed the ledger long ago. This is
-   * what gives the Scenario C migration genuinely stale records to page
-   * through — and it is deliberately not a second implementation of
-   * enrichment, just the one service invoked with different version stamps
-   * (and without the per-entry simulated model delay, which exists to
-   * demonstrate Scenario A's asynchrony, not to slow seeding by 400ms x N).
+   * Backfills every seeded entry through the real enrichment service, stamped
+   * at superseded model versions, so the migration has genuinely stale records
+   * to page through. Deliberately not a second implementation — the same
+   * service with different version stamps, minus the simulated delay.
    */
   async #enrichHistorical() {
     const entryRepository = new EntryRepository();
@@ -71,8 +63,8 @@ export class SeedRunner {
     );
 
     let enriched = 0;
-    // Keyset walk in _id order — same discipline the Scenario C migration will
-    // use: no skip(), no unbounded cursor held across slow work.
+    // Keyset walk in _id order: no skip(), no unbounded cursor held across
+    // slow work.
     let lastId = null;
     for (;;) {
       const batch = await Entry.find(lastId ? { _id: { $gt: lastId } } : {})
@@ -91,9 +83,8 @@ export class SeedRunner {
   }
 
   /**
-   * Drops both collections so that re-running the seed is idempotent — the
-   * reviewer will run this more than once, and appending would break the
-   * per-company unique index on entryNo.
+   * Drops both collections so re-running the seed is idempotent; appending
+   * would break the per-company unique index on entryNo.
    */
   async #resetCollections() {
     for (const model of [Entry, EntryVectors]) {
@@ -108,9 +99,8 @@ export class SeedRunner {
   }
 
   async #syncIndexes() {
-    // Indexes are built before insertion so the unique constraint on
-    // (companyId, entryNo) actually validates the generated data rather than
-    // being applied to it after the fact.
+    // Built before insertion so the unique (companyId, entryNo) constraint
+    // validates the generated data rather than being applied after the fact.
     await Entry.syncIndexes();
     await EntryVectors.syncIndexes();
     this.logger.log('[seed] indexes synced');
@@ -119,9 +109,8 @@ export class SeedRunner {
   async #insert(documents) {
     for (let i = 0; i < documents.length; i += INSERT_CHUNK_SIZE) {
       const chunk = documents.slice(i, i + INSERT_CHUNK_SIZE);
-      // `timestamps: false` preserves the historical `created`/`updated` values
-      // built by the factory; without it Mongoose would stamp every record with
-      // the current time and the ledger would have no history.
+      // Preserves the factory's historical created/updated values; otherwise
+      // Mongoose stamps everything now and the ledger has no history.
       await Entry.insertMany(chunk, { ordered: true, timestamps: false });
     }
     this.logger.log(`[seed] inserted ${documents.length} entries`);

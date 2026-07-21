@@ -1,14 +1,12 @@
 /**
  * Shared domain vocabulary.
  *
- * These are frozen value objects rather than classes because they carry no
- * behaviour — they are the enumerated vocabulary the schemas, worker, and
- * scripts all validate against. The strict-OO requirement applies to anything
- * carrying logic; declarative data like this is not wrapped in a ceremonial
- * class.
+ * Frozen value objects rather than classes because they carry no behaviour —
+ * they are the enumerated vocabulary the schemas, worker and scripts all
+ * validate against. The strict-OO requirement applies to anything carrying
+ * logic; declarative data like this is not wrapped in a ceremonial class.
  */
 
-/** Risk severity tiers. SPEC.md §3.1. */
 export const RiskTier = Object.freeze({
   LOW: 'low',
   MEDIUM: 'medium',
@@ -16,19 +14,15 @@ export const RiskTier = Object.freeze({
 });
 
 /**
- * Score thresholds separating the tiers. Lives here (not inline in the scorer)
- * because Scenario D — a regulatory/threshold shift — mutates exactly these,
- * and they need to be addressable from the partial-evaluation script.
+ * Lives here, not inline in the scorer, because a regulatory or threshold
+ * shift mutates exactly these and the re-evaluation script needs to address
+ * them.
  */
 export const RiskThresholds = Object.freeze({
   MEDIUM: 0.4,
   HIGH: 0.7
 });
 
-/**
- * Granular anomaly signal types. SPEC.md §3.2 requires signals that identify
- * both a type and the specific field they were raised against.
- */
 export const AnomalyType = Object.freeze({
   NUMERIC_OUTLIER: 'numeric_outlier',
   SEMANTIC_ANOMALY: 'semantic_anomaly',
@@ -43,7 +37,6 @@ export const AnomalySeverity = Object.freeze({
   CRITICAL: 'critical'
 });
 
-/** Lifecycle of the asynchronous enrichment pipeline for a single entry. */
 export const EnrichmentStatus = Object.freeze({
   PENDING: 'pending',
   PROCESSING: 'processing',
@@ -51,7 +44,7 @@ export const EnrichmentStatus = Object.freeze({
   FAILED: 'failed'
 });
 
-/** Why an entry was queued — drives which pipelines the worker runs. */
+/** Why an entry was queued — drives which pipeline the worker runs. */
 export const EnrichmentReason = Object.freeze({
   CREATE: 'create',
   CORE_FIELD_CHANGE: 'core_field_change',
@@ -60,11 +53,10 @@ export const EnrichmentReason = Object.freeze({
 });
 
 /**
- * Reasons whose jobs run the FULL pipeline (vectors + risk). `context_shift`
- * is deliberately absent: a Scenario D job runs the partial pipeline, which
- * holds no handle to the vectors collection at all. The delta router must
- * never let a partial enqueue overwrite one of these (a downgrade would drop
- * a recompute the entry is still owed).
+ * Reasons whose jobs run the full pipeline. `context_shift` is deliberately
+ * absent: it runs the partial pipeline, which has no handle to the vectors
+ * collection. The delta router must never let a partial enqueue overwrite one
+ * of these, since that would drop a recompute the entry is still owed.
  */
 export const FULL_RECOMPUTE_REASONS = Object.freeze([
   EnrichmentReason.CREATE,
@@ -72,14 +64,12 @@ export const FULL_RECOMPUTE_REASONS = Object.freeze([
   EnrichmentReason.MODEL_MIGRATION
 ]);
 
-/** Compliance evaluation outcome. */
 export const ComplianceStatus = Object.freeze({
   PASS: 'pass',
   REVIEW: 'review',
   FAIL: 'fail'
 });
 
-/** Auditor workflow states. Scenario E mutates these — metadata only. */
 export const WorkflowStatus = Object.freeze({
   UNREVIEWED: 'unreviewed',
   IN_REVIEW: 'in_review',
@@ -87,11 +77,7 @@ export const WorkflowStatus = Object.freeze({
   ESCALATED: 'escalated'
 });
 
-/**
- * The three vector spaces. SPEC.md §3.3 — semantic (text meaning), financial
- * (numeric patterns), entity (relational behaviour). These string values are
- * the "Search Strategy" accepted by POST /api/entries/search/similar.
- */
+/** These string values are the search strategies accepted by the similarity endpoint. */
 export const VectorSpace = Object.freeze({
   SEMANTIC: 'semantic',
   FINANCIAL: 'financial',
@@ -105,27 +91,22 @@ export const VECTOR_SPACES = Object.freeze([
 ]);
 
 /**
- * Vector dimensionality. Chosen so the analytical layer is genuinely heavier
- * than the baseline record (3 x 64 doubles ~= 1.5KB vs ~400 bytes), which is
- * what makes isolating it into its own collection a real optimisation rather
- * than a decorative one.
+ * Chosen so the analytical layer is genuinely heavier than the baseline record
+ * (3 x 64 doubles vs a few hundred bytes), which is what makes isolating it
+ * into its own collection a real optimisation rather than a decorative one.
  */
 export const VECTOR_DIMS = 64;
 
 /**
- * An internal approval limit. Amounts clustering just beneath it are the
- * classic structuring pattern the rounding detector flags. Lives here — not in
- * the seed's reference data — because Scenario D ("internal thresholds shift")
- * mutates exactly this kind of value, and because the detector must never
- * import seed data: reading the answer key is not detection. The seed imports
- * *this* constant so planted data and detection stay aligned by construction.
+ * An internal approval limit; amounts clustering just beneath it are the
+ * classic structuring pattern. Lives here rather than in the seed's reference
+ * data because a threshold shift mutates exactly this, and because the
+ * detector must never import seed data — reading the answer key is not
+ * detection. The seed imports this constant so planted data and detection
+ * cannot drift apart.
  */
 export const APPROVAL_THRESHOLD = 100000;
 
-/**
- * Current model versions. Scenario C migrates historical records from an older
- * version to these.
- */
 export const ModelVersion = Object.freeze({
   RISK: 'risk-v1',
   ANOMALY: 'anomaly-v1',
@@ -134,9 +115,8 @@ export const ModelVersion = Object.freeze({
 });
 
 /**
- * The versions those superseded. Exists so `npm run seed -- --enrich-historical`
- * can stamp records as enriched by the previous model generation, giving the
- * Scenario C migration genuinely stale data to page through.
+ * The versions those superseded, so the seed can stamp records as enriched by
+ * a previous model generation and give the migration genuinely stale data.
  */
 export const SupersededModelVersion = Object.freeze({
   RISK: 'risk-v0',
@@ -146,10 +126,8 @@ export const SupersededModelVersion = Object.freeze({
 });
 
 /**
- * Core financial fields. Editing any of these invalidates every computed
- * artefact and triggers a full recomputation — SPEC.md Scenario B. The delta
- * router (Day 3) reads this list; it is defined here so exactly one definition
- * of "core field" exists in the system.
+ * Editing any of these invalidates every computed artefact and triggers a full
+ * recomputation. Defined here so exactly one definition of "core field" exists.
  */
 export const CORE_FINANCIAL_FIELDS = Object.freeze([
   'amount',
@@ -159,20 +137,14 @@ export const CORE_FINANCIAL_FIELDS = Object.freeze([
 ]);
 
 /**
- * Balance sides. Deliberately NOT core financial fields: SPEC.md Scenario B
- * enumerates its invalidation set exhaustively ("amount, description,
- * glNumber, or postingDate") and leaves debit/credit outside it. Editing a
- * side changes the balance_mismatch signal — so risk and compliance must be
- * re-evaluated — but per the spec's own list it does not invalidate the
- * vectors. That is Scenario D's shape, and the delta router treats it so.
+ * Deliberately not core fields: the spec enumerates its invalidation set
+ * exhaustively and leaves debit/credit outside it. Editing a side changes the
+ * balance signal, so risk and compliance must be re-evaluated, but by that
+ * list it does not invalidate the vectors.
  */
 export const BALANCE_FIELDS = Object.freeze(['debit', 'credit']);
 
-/**
- * PUT delta-routing outcomes, labelled by the spec scenario they implement.
- * Returned in the PUT response so the routing decision is observable, not
- * inferred from side effects.
- */
+/** Returned in the PUT response so the routing decision is observable. */
 export const UpdateScenario = Object.freeze({
   CORE_FIELD_CHANGE: 'B',
   RISK_CONTEXT_CHANGE: 'D',
@@ -180,7 +152,6 @@ export const UpdateScenario = Object.freeze({
   NO_OP: 'no_op'
 });
 
-/** Collection names, centralised so scripts and models cannot drift apart. */
 export const Collections = Object.freeze({
   ENTRIES: 'entries',
   ENTRY_VECTORS: 'entry_vectors'

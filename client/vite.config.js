@@ -6,12 +6,11 @@ import { defineConfig, loadEnv } from 'vite';
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 /**
- * The client reads its two variables (CLIENT_PORT, VITE_API_BASE_URL) from the
- * repository-root .env — the same file the server and worker use — so there is
- * exactly one place to configure the stack.
+ * Config comes from the repository-root .env, the same file the server and
+ * worker read, so there is one place to configure the stack.
  *
  * /api is proxied to the Express server, so the browser only ever talks
- * same-origin to the dev server and the backend needs no CORS middleware.
+ * same-origin and the backend needs no CORS middleware.
  */
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, projectRoot, '');

@@ -1,10 +1,9 @@
 import { AnomalySeverity, AnomalyType, APPROVAL_THRESHOLD } from '../domain/Constants.js';
 
 /**
- * Terms that make a journal-entry narrative read as evasive or non-substantive
- * against normal business vocabulary. This list is the detector's own model of
- * suspicion — it deliberately does NOT import the seed's SUSPICIOUS_DESCRIPTIONS
- * (that would be reading the answer key rather than detecting anything).
+ * The detector's own model of suspicion. Deliberately not imported from the
+ * seed's planted descriptions — that would be reading the answer key rather
+ * than detecting anything.
  */
 const EVASIVE_TERMS = Object.freeze([
   'misc',
@@ -32,22 +31,13 @@ const BALANCE_EPSILON = 0.005;
 const SMALL_HOURS_END = 6;
 
 /**
- * The granular anomaly pipeline — SPEC.md §3.2. Evaluates specific fields
- * independently and emits one signal object per finding, each identifying its
- * type and the exact field it was raised against.
+ * Evaluates fields independently and emits one signal per finding, each
+ * naming its type and the field it was raised against (spec §3.2).
  *
- * Pure computation: the entry and a pre-fetched amount baseline go in, signal
- * objects come out. All I/O (fetching the baseline) stays in the enrichment
- * service so this class is trivially testable.
+ * Pure computation — the amount baseline is fetched by the caller so this
+ * class stays trivially testable.
  */
 export class AnomalyDetector {
-  /**
-   * @param {object} entry plain journal-entry document
-   * @param {{ count: number, medianLog: number, sigmaLog: number } | null} amountBaseline
-   *   robust log-amount statistics for this entry's (companyId, glNumber)
-   *   population, or null when no baseline is available
-   * @returns {object[]} anomaly signal objects, possibly empty
-   */
   detect(entry, amountBaseline = null) {
     const detectedAt = new Date();
     const signals = [
@@ -62,10 +52,10 @@ export class AnomalyDetector {
   }
 
   /**
-   * Balance interpretation per DECISIONS.md Day 1: each row is a single-sided
-   * ledger line, balanced when debit + credit === amount with exactly one side
-   * non-zero. (The literal "debit must equal credit" reading would flag the
-   * spec's own §2 example entry.)
+   * Each row is a single-sided ledger line, balanced when debit + credit
+   * equals amount with exactly one side non-zero. Note this is not the literal
+   * "debit must equal credit" reading, which would flag the spec's own example
+   * entry as high-risk.
    */
   #balanceMismatch(entry) {
     const bothSides = entry.debit > 0 && entry.credit > 0;
@@ -90,10 +80,7 @@ export class AnomalyDetector {
     };
   }
 
-  /**
-   * SPEC.md §3.1 names "2:00 AM on a Sunday" as the canonical unusual
-   * timestamp, so weekend small-hours postings score highest.
-   */
+  /** The spec names "2:00 AM on a Sunday", so weekend small-hours scores highest. */
   #temporalAnomaly(entry) {
     const posting = new Date(entry.postingDate);
     const hour = posting.getUTCHours();
@@ -114,13 +101,11 @@ export class AnomalyDetector {
   }
 
   /**
-   * Outlier relative to the robust log-scale baseline of the same GL account
-   * within the same company. Median/MAD rather than mean/stddev because the
-   * outliers being hunted would otherwise inflate the very spread they are
-   * measured against.
+   * Median/MAD rather than mean/stddev: the outliers being hunted would
+   * otherwise inflate the very spread they are measured against.
    */
   #numericOutlier(entry, baseline) {
-    // Fewer than 8 peers is not a population, it is an anecdote.
+    // Fewer than 8 peers is not a population.
     if (!baseline || baseline.count < 8 || entry.amount <= 0) return null;
 
     const distance = Math.abs(Math.log10(entry.amount) - baseline.medianLog);
@@ -138,10 +123,7 @@ export class AnomalyDetector {
     };
   }
 
-  /**
-   * Two shapes: implausibly round large amounts, and amounts clustered just
-   * beneath the internal approval threshold (structuring).
-   */
+  /** Implausibly round large amounts, and structuring just beneath the approval threshold. */
   #roundingPattern(entry) {
     const amount = entry.amount;
     const underThreshold = APPROVAL_THRESHOLD - amount;
@@ -169,7 +151,6 @@ export class AnomalyDetector {
     return null;
   }
 
-  /** Evasive vocabulary and non-narratives on the description field. */
   #semanticAnomaly(entry) {
     const text = String(entry.description ?? '').toLowerCase().trim();
     const hits = EVASIVE_TERMS.filter((term) => text.includes(term));

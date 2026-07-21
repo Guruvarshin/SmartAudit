@@ -20,11 +20,10 @@ import { EntryService } from '../src/services/EntryService.js';
 import { UpdatePlanner } from '../src/services/UpdatePlanner.js';
 
 /**
- * Tests for the PUT delta router — Scenario B (core field → full recompute),
- * D (balance side → partial re-eval, vectors untouched), E (metadata-only →
- * no queue). Real MongoDB, in its own database, for the same reason as
- * claim.test.js: the mechanisms under test (atomic combined write, CAS,
- * fence interaction) ARE MongoDB behaviours.
+ * The PUT delta router: core field → full recompute, balance side → partial
+ * re-evaluation with vectors untouched, metadata-only → no queue. Real
+ * MongoDB, since the atomic combined write, CAS and fence interaction are
+ * MongoDB behaviours.
  */
 
 const LEASE_MS = 60000;

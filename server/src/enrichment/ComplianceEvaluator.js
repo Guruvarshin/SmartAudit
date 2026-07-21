@@ -1,6 +1,5 @@
 import { AnomalySeverity, AnomalyType, ComplianceStatus, RiskTier } from '../domain/Constants.js';
 
-/** Which compliance flag, if any, each anomaly type raises. */
 const FLAG_RULES = Object.freeze({
   [AnomalyType.BALANCE_MISMATCH]: {
     code: 'UNBALANCED_JOURNAL_LINE',

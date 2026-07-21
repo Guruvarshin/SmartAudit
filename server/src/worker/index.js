@@ -8,15 +8,11 @@ import { CliArguments } from '../util/CliArguments.js';
 import { EnrichmentWorker } from './EnrichmentWorker.js';
 
 /**
- * Entry point for `npm run start:worker`.
+ * Entry point for `npm run start:worker`. Accepts --name (to label logs when
+ * running several) and --concurrency.
  *
- *   npm run start:worker
- *   npm run start:worker -- --name=A        # label logs when running several
- *   npm run start:worker -- --concurrency=1
- *
- * Running MORE THAN ONE of these simultaneously is supported and safe — the
- * atomic claim in EntryRepository is the guarantee — and doing so is the Day 2
- * race-condition demonstration.
+ * Running more than one process at once is safe; the atomic claim in
+ * EntryRepository is what guarantees it.
  */
 class WorkerCommand {
   constructor() {
@@ -31,10 +27,8 @@ class WorkerCommand {
 
     const entryRepository = new EntryRepository();
     const entryVectorsRepository = new EntryVectorsRepository();
-    // One shared partial service: context_shift jobs run it directly (it holds
-    // no vectors handle — the Scenario D guarantee), and the full pipeline
-    // composes it, so both share one baseline cache and one scoring
-    // implementation.
+    // Shared: partial jobs run this directly and the full pipeline composes
+    // it, so there is one scoring implementation rather than two that drift.
     const partialEvaluationService = new PartialEvaluationService({
       entryRepository,
       delayMs: this.config.enrichmentDelayMs

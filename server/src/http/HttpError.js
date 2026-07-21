@@ -1,6 +1,5 @@
 /**
- * An error that knows its HTTP status. Services throw these; the App's error
- * middleware maps them to responses. Anything that is NOT an HttpError is a
+ * An error that knows its HTTP status. Anything that is not an HttpError is a
  * programming fault and surfaces as an opaque 500.
  */
 export class HttpError extends Error {

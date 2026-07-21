@@ -7,13 +7,8 @@ import { CliArguments } from '../util/CliArguments.js';
 import { ModelMigrationService } from './ModelMigrationService.js';
 
 /**
- * Entry point for `npm run migrate:models` — SPEC.md Scenario C.
- *
- *   npm run migrate:models                     # migrate everything stale
- *   npm run migrate:models -- --dry-run        # report stale counts only
- *   npm run migrate:models -- --batch-size=50  # override the keyset page size
- *
- * Prime stale data first with: npm run seed -- --enrich-historical
+ * Entry point for `npm run migrate:models`. Accepts --dry-run and
+ * --batch-size. Prime stale data first with `npm run seed -- --enrich-historical`.
  */
 class MigrateModelsCommand {
   constructor() {

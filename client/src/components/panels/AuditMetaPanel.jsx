@@ -4,9 +4,8 @@ import { Format } from '../../util/Format.js';
 import { WorkflowBadge } from '../Badges.jsx';
 
 /**
- * Scenario E's surface: workflow status + append-only auditor comments.
- * Saved through the same PUT, but the backend routes it synchronously —
- * no queue, no worker, and the response's routing block proves it ('E').
+ * Workflow status and append-only comments. Saved through the same PUT, but
+ * routed synchronously by the backend — no queue, no worker.
  */
 export class AuditMetaPanel extends React.Component {
   constructor(props) {

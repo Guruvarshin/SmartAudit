@@ -1,10 +1,9 @@
 /**
  * Reference data for generated ledgers.
  *
- * Descriptions are paired to their GL account so seeded entries read like a
- * real chart of accounts rather than random strings — which matters because
- * the semantic-anomaly cohort is only detectable as anomalous relative to a
- * plausible baseline.
+ * Descriptions are paired to their GL account so entries read like a real
+ * chart of accounts — the semantic-anomaly cohort is only detectable as
+ * anomalous relative to a plausible baseline.
  */
 
 export const GL_ACCOUNTS = Object.freeze([
@@ -143,8 +142,7 @@ export const VENDORS = Object.freeze([
 
 /**
  * Descriptions that should read as uncharacteristic against the vocabulary
- * above — vague, self-referential, or clearly not a business narrative. These
- * are the intended targets of a `semantic_anomaly` on the `description` field.
+ * above — the intended targets of a semantic anomaly.
  */
 export const SUSPICIOUS_DESCRIPTIONS = Object.freeze([
   'misc adjustment',
@@ -162,9 +160,8 @@ export const SUSPICIOUS_DESCRIPTIONS = Object.freeze([
 export const CURRENCIES = Object.freeze(['INR', 'INR', 'INR', 'INR', 'USD', 'USD', 'EUR']);
 
 /**
- * Fixed tenant and user identifiers. Hard-coded rather than generated so that
- * seeded data is stable across runs and the README can reference a company id
- * directly.
+ * Hard-coded rather than generated so seeded data is stable across runs and
+ * can be referenced by id.
  */
 export const COMPANIES = Object.freeze([
   { _id: '6650a1f4c3d2e10000000001', name: 'Northwind Manufacturing Pvt Ltd', weight: 0.8 },
@@ -189,9 +186,8 @@ export const POSTING_USERS = Object.freeze([
 ]);
 
 /**
- * The internal approval limit the near-threshold cohort clusters beneath.
  * Re-exported from the domain layer so the seed plants against the same value
- * the detector inspects — they cannot drift apart.
+ * the detector inspects, and the two cannot drift apart.
  */
 export { APPROVAL_THRESHOLD } from '../domain/Constants.js';
 
@@ -206,9 +202,9 @@ export const Cohort = Object.freeze({
 });
 
 /**
- * Cohort mix. Weighted so the great majority of the ledger is unremarkable —
- * a seed where a third of entries are anomalous would make the risk scorer look
- * good for the wrong reason.
+ * Weighted so most of the ledger is unremarkable — a seed where a third of
+ * entries are anomalous would make the risk scorer look good for the wrong
+ * reason.
  */
 export const COHORT_MIX = Object.freeze([
   { cohort: Cohort.CLEAN, share: 0.65 },
@@ -220,8 +216,7 @@ export const COHORT_MIX = Object.freeze([
   { cohort: Cohort.NEAR_DUPLICATE, share: 0.03 }
 ]);
 
-/** Anchor date for generated ledger history. Fixed, to keep runs reproducible. */
+/** Fixed, to keep runs reproducible. */
 export const REFERENCE_DATE = Object.freeze(new Date('2026-07-20T00:00:00.000Z'));
 
-/** How far back the generated ledger stretches. */
 export const HISTORY_DAYS = 180;

@@ -3,15 +3,11 @@ import { ModelVersion, VECTOR_SPACES } from '../domain/Constants.js';
 import { HttpError } from '../http/HttpError.js';
 
 /**
- * GET /api/entries/:id/vectors — the read-only vector view behind the
- * diagnostics modal's multi-vector panel (the second of the two consumers
- * Day 1 named for `entry_vectors`, alongside the similarity endpoint).
+ * Read-only vector view behind the diagnostics modal.
  *
- * A separate class rather than a method on EntryService on purpose:
- * EntryService owns the PUT path, whose Scenario D route must never hold a
- * handle to the vectors collection. Keeping this read in its own service
- * preserves that import boundary — EntryService still imports nothing
- * vector-shaped.
+ * Deliberately a separate class rather than a method on EntryService: that
+ * class owns the PUT path, which must never hold a handle to the vectors
+ * collection.
  */
 export class VectorDiagnosticsService {
   constructor({ entryRepository, entryVectorsRepository }) {
@@ -19,11 +15,6 @@ export class VectorDiagnosticsService {
     this.entryVectorsRepository = entryVectorsRepository;
   }
 
-  /**
-   * @returns {Promise<{ entryId: string, modelVersion: string, stale: boolean,
-   *   sourceHash: string, dims: number,
-   *   spaces: Record<string, { values: number[], norm: number }> }>}
-   */
   async getForEntry(id) {
     const entryId = this.#objectId(id);
 

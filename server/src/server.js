@@ -3,9 +3,8 @@ import { Config } from './config/Config.js';
 import { MongoConnection } from './db/MongoConnection.js';
 
 /**
- * Entry point for `npm run start:server`. Process concerns only: config,
- * database connection, listening socket, graceful shutdown. The application
- * itself lives in App.
+ * Entry point for `npm run start:server`. Process concerns only — the
+ * application itself lives in App.
  */
 class ServerCommand {
   constructor() {

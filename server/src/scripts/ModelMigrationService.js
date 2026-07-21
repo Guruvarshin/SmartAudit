@@ -2,15 +2,13 @@ import { ModelVersion } from '../domain/Constants.js';
 import { KeysetPager } from '../util/KeysetPager.js';
 
 /**
- * Scenario C: pages through historical entries stamped at superseded model
- * versions and re-enriches each at the current versions — vectors and
- * analytics both — using keyset pagination so memory stays bounded no matter
- * how deep the ledger history is.
+ * Pages through entries stamped at superseded model versions and re-enriches
+ * each at the current versions, using keyset pagination so memory stays
+ * bounded however deep the history is.
  *
- * Safe to run while the API and workers are live: every write is guarded
- * (see EnrichmentService.migrateStale), so a concurrent worker recompute is
- * never clobbered, and re-running the migration after a crash converges — the
- * version stamp itself is the checkpoint, no state file needed.
+ * Safe to run while the API and workers are live: every write is guarded, so
+ * a concurrent recompute is never clobbered, and re-running after a crash
+ * converges because the version stamp is itself the checkpoint.
  */
 export class ModelMigrationService {
   constructor({ entryRepository, enrichmentService, batchSize, dryRun = false, logger = console }) {

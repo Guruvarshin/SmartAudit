@@ -2,27 +2,17 @@ import { createHash } from 'node:crypto';
 import { CORE_FINANCIAL_FIELDS, VECTOR_DIMS } from '../domain/Constants.js';
 
 /**
- * Simulated multi-space embedding engine — SPEC.md §3.3.
+ * Simulated multi-space embedding engine.
  *
- * Deliberately deterministic (feature hashing, no RNG): the same entry always
- * produces the same vectors, and *similar* entries produce *nearby* vectors.
- * That second property is the point — random vectors would make the similarity
- * endpoint a lottery, while hashed shared features mean the seed's planted
- * near-duplicate clusters (same vendor, amount, day, cosmetically varied
- * descriptions) genuinely land close in cosine space, so Day 3's search finds
- * planted neighbours instead of noise.
+ * Deterministic feature hashing rather than an RNG, because similar entries
+ * must produce nearby vectors — random vectors would make similarity search a
+ * lottery regardless of how well-formed the endpoint was.
  *
- * Each space encodes a different notion of similarity:
- *  - semantic:  word tokens + character trigrams of the description
- *  - financial: magnitude, roundness, side, balance and timing features
- *  - entity:    who and what the entry relates to (vendor, GL account, poster)
+ * Each space encodes a different notion of similarity: semantic from
+ * description text, financial from magnitude and timing, entity from vendor,
+ * GL account and poster.
  */
 export class VectorGenerator {
-  /**
-   * @param {object} entry plain journal-entry document
-   * @returns {{ semantic: number[], financial: number[], entity: number[],
-   *             norms: object, dims: number, sourceHash: string }}
-   */
   generate(entry) {
     const semantic = this.#embed(this.#semanticFeatures(entry));
     const financial = this.#embed(this.#financialFeatures(entry));
@@ -43,10 +33,8 @@ export class VectorGenerator {
   }
 
   /**
-   * Hash of exactly the core financial fields (the Scenario B invalidation
-   * set). Persisted beside the vectors so "these vectors describe *that*
-   * content" is checkable: edit a core field and the stored hash visibly
-   * diverges from the recomputed one until enrichment catches up.
+   * Hash of exactly the core financial fields, stored beside the vectors so
+   * that "these vectors describe that content" stays checkable after an edit.
    */
   #sourceHash(entry) {
     const material = CORE_FINANCIAL_FIELDS.map((field) => {
@@ -56,10 +44,7 @@ export class VectorGenerator {
     return createHash('sha256').update(material).digest('hex');
   }
 
-  // ---------------------------------------------------------------------------
-  // Feature extraction. Each feature is a (key, value) pair; keys are hashed
-  // into dimensions below.
-  // ---------------------------------------------------------------------------
+  // Each feature is a (key, value) pair; keys are hashed into dimensions.
 
   #semanticFeatures(entry) {
     const text = String(entry.description ?? '').toLowerCase().trim();
@@ -68,8 +53,7 @@ export class VectorGenerator {
     const tokens = text.split(/[^a-z0-9]+/).filter(Boolean);
     for (const token of tokens) features.push([`w:${token}`, 1]);
 
-    // Character trigrams make cosmetic variants (case, whitespace, small
-    // suffixes) overlap heavily even when whole words differ.
+    // Trigrams make cosmetic variants overlap even when whole words differ.
     const squashed = tokens.join(' ');
     for (let i = 0; i <= squashed.length - 3; i += 1) {
       features.push([`t:${squashed.slice(i, i + 3)}`, 0.5]);

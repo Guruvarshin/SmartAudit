@@ -12,12 +12,7 @@ import {
 
 const { Schema } = mongoose;
 
-/**
- * One contributing factor behind a risk score. SPEC.md §3.1 requires the score
- * be *multi-factor*; persisting the individual contributions is what makes that
- * demonstrable rather than asserted, and it is what the Day 4 diagnostics modal
- * renders as a breakdown.
- */
+/** Persisting individual contributions is what makes the score inspectable. */
 const RiskFactorSchema = new Schema(
   {
     code: { type: String, required: true },
@@ -28,10 +23,7 @@ const RiskFactorSchema = new Schema(
   { _id: false }
 );
 
-/**
- * A granular anomaly signal. SPEC.md §3.2 requires each signal to identify both
- * its type and the specific field it was raised against.
- */
+/** Each signal identifies both its type and the field it was raised against. */
 const AnomalySignalSchema = new Schema(
   {
     type: { type: String, enum: Object.values(AnomalyType), required: true },
@@ -63,9 +55,10 @@ const ComplianceFlagSchema = new Schema(
 );
 
 /**
- * The cheap half of the analytical layer — scalars and small arrays that the
- * dashboard reads on every list request. The expensive half (the three vector
- * spaces) lives in its own collection; see models/EntryVectors.js for why.
+ * The cheap half of the analytical layer, read on every list request. The
+ * vector spaces live in their own collection — see EntryVectors.js.
+ *
+ * `enrichment` doubles as the job record: there is no separate queue.
  */
 const AnalyticsSchema = new Schema(
   {
@@ -118,8 +111,8 @@ const CommentSchema = new Schema(
 );
 
 /**
- * Auditor workflow state. SPEC.md Scenario E: changes here carry no financial
- * substance, so they are written synchronously and never enter the queue.
+ * Auditor workflow state. Changes here carry no financial substance, so they
+ * are written synchronously and never enter the queue.
  */
 const AuditMetaSchema = new Schema(
   {
@@ -136,11 +129,8 @@ const AuditMetaSchema = new Schema(
 
 const EntrySchema = new Schema(
   {
-    // -----------------------------------------------------------------------
-    // Baseline ingested fields — SPEC.md §2.
-    // These names and this structure are fixed by the specification. Do not
-    // rename, nest, or add to this block.
-    // -----------------------------------------------------------------------
+    // Baseline ingested fields. These names and this structure are fixed by
+    // the specification — do not rename, nest, or add to this block.
     postingDate: { type: Date, required: true },
     transactionType: { type: String, required: true, default: 'Journal Entry' },
     entryNo: { type: String, required: true, trim: true },
@@ -156,22 +146,18 @@ const EntrySchema = new Schema(
     userId: { type: Schema.Types.ObjectId, required: true },
     sourceId: { type: String, required: true },
     uploadId: { type: String, required: true },
-    // `created` / `updated` are managed by the timestamps option below, which is
-    // configured to use the spec's field names rather than Mongoose defaults.
+    // `created` / `updated` come from the timestamps option below.
     systemCreated: { type: Boolean, required: true, default: false },
     uploadSourceType: { type: Number, required: true, default: 1 },
 
-    // -----------------------------------------------------------------------
-    // Appended analytical metadata — my design, sibling to the baseline block
-    // so the baseline field set above stays byte-identical to the spec.
-    // -----------------------------------------------------------------------
+    // Appended analytical metadata, sibling to the baseline block so that
+    // block stays identical to the spec.
     analytics: { type: AnalyticsSchema, default: () => ({}) },
     auditMeta: { type: AuditMetaSchema, default: () => ({}) }
   },
   {
     collection: Collections.ENTRIES,
-    // The spec fixes these two field names; without this Mongoose would add its
-    // own createdAt/updatedAt alongside them.
+    // The spec fixes these names; otherwise Mongoose adds createdAt/updatedAt.
     timestamps: { createdAt: 'created', updatedAt: 'updated' },
     strict: true,
     minimize: false,
@@ -179,19 +165,15 @@ const EntrySchema = new Schema(
   }
 );
 
-// Dashboard default listing: a company's ledger, most recent first.
 EntrySchema.index({ companyId: 1, postingDate: -1 }, { name: 'company_ledger' });
 
-// Risk filtering and sorting — the dashboard's "show me the high-risk entries"
-// path, and the colour-coding query.
 EntrySchema.index(
   { companyId: 1, 'analytics.risk.tier': 1, 'analytics.risk.score': -1 },
   { name: 'risk_triage' }
 );
 
-// The worker's claim scan. Partial so the index contains only in-flight jobs
-// rather than an entry for every historical record — on a ledger where almost
-// everything is already enriched, this keeps the hot path index tiny.
+// The worker's claim scan. Partial so the index holds only in-flight jobs
+// rather than every historical record, keeping this hot path tiny.
 EntrySchema.index(
   { 'analytics.enrichment.status': 1, _id: 1 },
   {
@@ -204,14 +186,12 @@ EntrySchema.index(
   }
 );
 
-// Scenario C: keyset pagination over records stamped at a superseded model
-// version. Compound with _id so the migration pages on the sort key directly.
+// Compound with _id so the model migration pages on the sort key directly.
 EntrySchema.index(
   { 'analytics.risk.modelVersion': 1, _id: 1 },
   { name: 'risk_model_version_scan' }
 );
 
-// Entry numbers identify a journal entry within a company's ledger.
 EntrySchema.index({ companyId: 1, entryNo: 1 }, { name: 'company_entry_no', unique: true });
 
 export const Entry = mongoose.model('Entry', EntrySchema);

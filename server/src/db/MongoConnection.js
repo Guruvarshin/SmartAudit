@@ -1,11 +1,8 @@
 import mongoose from 'mongoose';
 
 /**
- * Owns the Mongoose connection lifecycle.
- *
- * Every entry point (server, worker, seed, migration CLI) goes through this
- * class so connection options, index synchronisation, and shutdown behave
- * identically regardless of which process is running.
+ * Every entry point goes through this class so connection options, index
+ * synchronisation and shutdown behave identically in each process.
  */
 export class MongoConnection {
   constructor(uri, { logger = console } = {}) {
@@ -17,9 +14,8 @@ export class MongoConnection {
   async connect() {
     if (this.connection) return this.connection;
 
-    // Fail fast rather than buffering commands for 30s when Mongo is not up —
-    // the most common local failure is simply forgetting `docker compose up`,
-    // and a prompt, clear error is worth more than a retry here.
+    // Fail fast rather than buffering for 30s: the usual cause is simply
+    // forgetting `docker compose up`, and a prompt error beats a retry.
     mongoose.set('bufferCommands', false);
     mongoose.set('strictQuery', true);
 
@@ -35,10 +31,8 @@ export class MongoConnection {
   }
 
   /**
-   * Brings the deployed indexes in line with the schema definitions, dropping
-   * any that are no longer declared. Called by the seed script; the server and
-   * worker rely on indexes already being in place rather than building them on
-   * every boot.
+   * Called by the seed script only; the server and worker rely on indexes
+   * already existing rather than building them on every boot.
    */
   async syncIndexes(models) {
     for (const model of models) {

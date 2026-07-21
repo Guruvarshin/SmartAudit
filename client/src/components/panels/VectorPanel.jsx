@@ -2,7 +2,7 @@ import React from 'react';
 import { VECTOR_STRATEGIES } from '../../domain/constants.js';
 import { StaleBadge } from '../Badges.jsx';
 
-/** Inline SVG bar rendering of one 64-dim vector, signed values around a midline. */
+/** Signed values as bars around a midline. */
 export class VectorBars extends React.Component {
   render() {
     const { values } = this.props;
@@ -42,9 +42,9 @@ export class VectorBars extends React.Component {
 }
 
 /**
- * The multi-vector deep dive: all three spaces from GET /api/entries/:id/vectors.
- * These live in the separate `entry_vectors` collection — the panel visibly
- * not moving during a Scenario D update is the schema isolation on display.
+ * All three spaces, read from the separate entry_vectors collection. This
+ * panel visibly not moving during a risk-only update is the schema isolation
+ * on display.
  */
 export class VectorPanel extends React.Component {
   render() {

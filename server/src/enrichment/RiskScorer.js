@@ -1,20 +1,10 @@
 import { AnomalyType, RiskThresholds, RiskTier } from '../domain/Constants.js';
 
 /**
- * Weight of each anomaly type's contribution to the composite risk score.
- *
- * Calibration notes (against the tier thresholds in Constants.js):
- *  - an unbalanced line alone (0.45) lands medium — a broken ledger line is
- *    never a low-risk event;
- *  - the spec's canonical "2:00 AM on a Sunday" posting alone (1.0 × 0.40)
- *    lands medium, satisfying §3.1's demand that unusual timestamps
- *    "programmatically trigger higher risk elevations";
- *  - unbalanced AND off-hours (0.45 + 0.40) crosses into high — the seed
- *    deliberately plants this overlap, and additive factors are what make the
- *    combination outrank either cause alone;
- *  - a hard numeric outlier alone (up to 0.40) reaches medium;
- *  - rounding and narrative signals are corroborating evidence, not
- *    independently damning.
+ * Calibrated against the tier thresholds in Constants.js: an unbalanced line
+ * alone reaches medium, as does an off-hours posting alone; the two together
+ * cross into high. Rounding and narrative signals are corroborating evidence
+ * rather than independently damning.
  */
 const FACTOR_WEIGHTS = Object.freeze({
   [AnomalyType.BALANCE_MISMATCH]: { weight: 0.45, label: 'Unbalanced ledger line' },
@@ -25,19 +15,11 @@ const FACTOR_WEIGHTS = Object.freeze({
 });
 
 /**
- * Multi-factor risk scoring — SPEC.md §3.1.
- *
- * "Multi-factor" is demonstrable, not asserted: every contributing factor is
- * returned with its weight and contribution, persisted to analytics.risk.factors,
- * and rendered as a breakdown in the Day 4 diagnostics modal. The composite is
- * a clamped weighted sum, so co-occurring causes (the seed's unbalanced ×
- * off-hours overlap) genuinely outrank any single cause.
+ * Every contributing factor is returned with its weight and contribution, so
+ * the score is inspectable rather than opaque. The composite is a clamped
+ * weighted sum, which is what makes co-occurring causes outrank a single one.
  */
 export class RiskScorer {
-  /**
-   * @param {object[]} signals output of AnomalyDetector.detect()
-   * @returns {{ score: number, tier: string, factors: object[] }}
-   */
   score(signals) {
     const factors = signals
       .filter((signal) => FACTOR_WEIGHTS[signal.type])

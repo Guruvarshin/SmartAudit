@@ -7,17 +7,14 @@ import { NewEntryForm } from './NewEntryForm.jsx';
 import { SummaryBar } from './SummaryBar.jsx';
 
 /**
- * The command center (SPEC.md §4 names this class). Owns the entry list and
- * the polling loop that keeps it honest while the background worker enriches
- * asynchronously.
+ * Owns the entry list and the polling loop that keeps it current while the
+ * worker enriches asynchronously.
  *
- * Polling design (consistent with the Day 2 queue decision): the queue state
- * IS `analytics.enrichment.status` on the entry document, so re-fetching the
- * list is reading the queue — there is no separate job API to reconcile with.
- * A setTimeout chain (not setInterval, so a slow response can never overlap
- * the next tick) re-arms after every fetch: 2s while any visible entry is
- * pending/processing, 10s once everything is settled. Started in
- * componentDidMount, torn down in componentWillUnmount.
+ * The queue state is `analytics.enrichment.status` on the entry itself, so
+ * re-fetching the list is reading the queue — there is no separate job API. A
+ * setTimeout chain rather than setInterval, so a slow response can never
+ * overlap the next tick; it re-arms fast while anything is in flight and
+ * slowly once everything is settled.
  */
 export class AuditDashboard extends React.Component {
   constructor(props) {
@@ -57,12 +54,11 @@ export class AuditDashboard extends React.Component {
     }
   }
 
-  /** One guarded fetch; every completion (success or failure) re-arms the timer. */
   async refresh() {
     if (this.fetchInFlight || this.unmounted) return;
     this.fetchInFlight = true;
-    // Scheduling decisions use this local, not this.state — setState is
-    // asynchronous and would lag one commit behind the fetch we just did.
+    // Scheduling uses this local, not this.state: setState is asynchronous
+    // and would lag one commit behind the fetch just completed.
     let latest = this.state.entries;
     try {
       const entries = await this.props.apiClient.listEntries({
@@ -97,7 +93,7 @@ export class AuditDashboard extends React.Component {
     this.refresh();
   }
 
-  /** A created entry is born 'pending' — surface it and tighten the poll. */
+  /** A new entry is born 'pending', so surface it and tighten the poll. */
   handleEntryCreated(entry) {
     this.setState(
       (state) => ({ entries: [entry, ...(state.entries ?? [])] }),
@@ -105,10 +101,7 @@ export class AuditDashboard extends React.Component {
     );
   }
 
-  /**
-   * Merge an entry mutated elsewhere (modal PUT, modal poll) into the list so
-   * the table reflects it without waiting for the next list poll.
-   */
+  /** Merges an entry mutated in the modal so the table updates immediately. */
   handleEntryChanged(entry) {
     this.setState(
       (state) => ({

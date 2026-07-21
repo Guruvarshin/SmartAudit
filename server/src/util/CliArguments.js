@@ -1,8 +1,6 @@
 /**
- * Minimal parser for `--key=value` and `--flag` style arguments.
- *
- * Shared by the seed script and (from Day 3) the model-migration CLI so both
- * accept arguments the same way.
+ * Minimal parser for `--key=value` and `--flag` arguments, shared by every
+ * CLI so they all accept arguments the same way.
  */
 export class CliArguments {
   constructor(argv = process.argv.slice(2)) {

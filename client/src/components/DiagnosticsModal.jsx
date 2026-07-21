@@ -12,17 +12,13 @@ import { SimilarityPanel } from './panels/SimilarityPanel.jsx';
 import { VectorPanel } from './panels/VectorPanel.jsx';
 
 /**
- * The deep-dive diagnostics modal (SPEC.md §5.1.1): risk breakdown, anomaly
- * signals, compliance flags, the three vector spaces, similarity search, the
- * PUT edit surface, and the Scenario E audit-metadata surface.
+ * Deep-dive view: risk, anomalies, compliance, the three vector spaces,
+ * similarity search, and both edit surfaces.
  *
- * While the entry is pending/processing (a recompute the modal itself may
- * have triggered), it polls GET /api/entries/:id every 2s — the enrichment
- * status on the entry IS the queue state, per the Day 2 design — and
- * refetches vectors when enrichment completes. The PUT response's routing
- * block decides what to expect: B/D mean "worker owed, poll fast", E/no_op
- * mean nothing asynchronous happened (recorded Day 3 decision: the UI reads
- * routing.scenario, it does not re-derive the classification).
+ * Polls the entry only while it is pending or processing, and refetches
+ * vectors once enrichment completes. What to expect after a save comes from
+ * the PUT response's routing block rather than being re-derived here: B and D
+ * mean a worker is owed, E and no_op mean nothing asynchronous happened.
  */
 export class DiagnosticsModal extends React.Component {
   constructor(props) {
@@ -64,8 +60,7 @@ export class DiagnosticsModal extends React.Component {
   }
 
   async #refreshEntry() {
-    // setState is asynchronous, so scheduling decisions are made from this
-    // local variable — never from this.state, which may lag one commit behind.
+    // Scheduling reads this local, never this.state, which may lag a commit.
     let latest = this.state.entry;
     try {
       const previousStatus = latest?.analytics?.enrichment?.status;
@@ -76,8 +71,8 @@ export class DiagnosticsModal extends React.Component {
       this.setState({ entry, loadError: null });
       this.props.onEntryChanged(entry);
 
-      // A pending→complete transition means the worker just landed fresh
-      // analytics — and, after a Scenario B recompute, fresh vectors too.
+      // A pending→complete transition means fresh analytics just landed, and
+      // after a full recompute, fresh vectors too.
       const status = entry.analytics?.enrichment?.status;
       if (previousStatus && previousStatus !== status && status === 'complete') {
         this.#refreshVectors();
@@ -103,29 +98,24 @@ export class DiagnosticsModal extends React.Component {
     }
   }
 
-  /**
-   * @param {object|null} entry the entry the decision is based on — passed
-   * explicitly because callers usually hold a fresher document than
-   * this.state (setState has not committed yet).
-   */
+  /** `entry` is passed explicitly because callers hold a fresher document than state. */
   #schedulePoll(entry = this.state.entry) {
     if (this.unmounted) return;
     if (this.pollTimer) clearTimeout(this.pollTimer);
-    // Poll only while the worker owes this entry a result; the dashboard's
-    // slower list poll covers everything else.
+    // Only while the worker owes this entry a result; the dashboard's slower
+    // list poll covers everything else.
     if (isInFlight(entry)) {
       this.pollTimer = setTimeout(() => this.#refreshEntry(), POLL_ACTIVE_MS);
     }
   }
 
-  /** A PUT landed: adopt the returned entry and let its routing set expectations. */
   handleSaved(routing, entry) {
     this.setState({ entry, lastRouting: routing });
     this.props.onEntryChanged(entry);
     this.#schedulePoll(entry);
   }
 
-  /** The 409-reload path: server truth replaces our snapshot, no routing to show. */
+  /** The 409 path: server truth replaces our snapshot, no routing to show. */
   handleReloaded(entry) {
     this.setState({ entry, lastRouting: null });
     this.props.onEntryChanged(entry);

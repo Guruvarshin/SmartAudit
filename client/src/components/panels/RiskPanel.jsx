@@ -2,7 +2,6 @@ import React from 'react';
 import { Format } from '../../util/Format.js';
 import { TierBadge } from '../Badges.jsx';
 
-/** Multi-factor risk breakdown: score, tier, and the itemised factors. */
 export class RiskPanel extends React.Component {
   render() {
     const { risk } = this.props;

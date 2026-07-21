@@ -2,7 +2,7 @@
 
 An AI-enriched financial audit engine over a MongoDB journal ledger: entries are ingested through a REST API, enriched asynchronously by a background worker (risk scoring, granular anomaly detection, and three separate vector spaces), and explored through a React dashboard with a multi-vector diagnostics modal.
 
-Built to the SmartAudit assessment specification. Every architectural decision, the alternatives weighed against it, and the reasoning is recorded in [`DECISIONS.md`](DECISIONS.md); the summary below is drawn from it. Section references below (e.g. "spec §3.3") point into the assessment brief.
+Built to the SmartAudit assessment specification. The [architecture decisions](#architecture-decisions) section below sets out each significant choice, the alternatives weighed against it, and the reasoning — including the trade-offs knowingly accepted. Section references (e.g. "spec §3.3") point into the assessment brief.
 
 **Stack:** Node.js ≥ 20 · Express 5 · MongoDB 7 · Mongoose 8 · React 18 (class components) · Vite · Bootstrap 5. Plain JavaScript throughout — no TypeScript, no build step on the server.
 
@@ -238,7 +238,7 @@ Uniform shape `{ "error": "message" }`, plus `"details"` where useful (field-lev
 
 ## Architecture decisions
 
-Condensed from [`DECISIONS.md`](DECISIONS.md), which records the alternatives and full reasoning for each.
+The choices that shaped this system, and why each was made over its alternatives.
 
 ### Two collections: the ledger, and the expensive layer
 

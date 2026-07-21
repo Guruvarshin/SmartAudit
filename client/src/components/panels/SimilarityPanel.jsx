@@ -5,9 +5,8 @@ import { Format } from '../../util/Format.js';
 import { StaleBadge, TierBadge } from '../Badges.jsx';
 
 /**
- * POST /api/entries/search/similar with the three-strategy toggle. Results
- * carry the cosine similarity, the candidate's risk tier, and a stale badge
- * when its vectors predate the current model version (Scenario C surface).
+ * Three-strategy similarity search. Candidates whose vectors predate the
+ * current model version are badged stale rather than silently compared.
  */
 export class SimilarityPanel extends React.Component {
   constructor(props) {
@@ -21,8 +20,8 @@ export class SimilarityPanel extends React.Component {
   }
 
   handleStrategy(strategy) {
-    // Re-clicking the active strategy re-runs it (results may have shifted
-    // after a recompute or migration).
+    // Re-clicking the active strategy re-runs it: results shift after a
+    // recompute or migration.
     this.setState({ strategy, loading: true, error: null }, () => this.#search(strategy));
   }
 

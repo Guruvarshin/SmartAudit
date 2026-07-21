@@ -7,7 +7,6 @@ import {
   WORKFLOW_BADGE_CLASS
 } from '../domain/constants.js';
 
-/** Risk tier chip; renders an em-dash chip while the entry is un-scored. */
 export class TierBadge extends React.Component {
   render() {
     const { tier } = this.props;
@@ -16,7 +15,6 @@ export class TierBadge extends React.Component {
   }
 }
 
-/** Enrichment lifecycle chip; pending/processing animate to signal the worker is owed. */
 export class EnrichmentStatusBadge extends React.Component {
   render() {
     const { status } = this.props;
@@ -70,7 +68,7 @@ export class WorkflowBadge extends React.Component {
   }
 }
 
-/** Marks similarity candidates / vector docs computed by a superseded model (Scenario C). */
+/** Marks vectors computed by a superseded model version. */
 export class StaleBadge extends React.Component {
   render() {
     if (!this.props.stale) return null;

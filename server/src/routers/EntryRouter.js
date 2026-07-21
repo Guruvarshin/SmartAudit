@@ -1,17 +1,11 @@
 import express from 'express';
 
 /**
- * Route table for /api/entries. Owns an express.Router and binds each path to
- * a controller method, wrapping every handler so a rejected promise reaches
- * the error middleware instead of hanging the request.
+ * Binds /api/entries routes to controller methods, wrapping each so a
+ * rejected promise reaches the error middleware instead of hanging.
  *
- * Spec-fixed paths (names are contractual):
- *   POST /api/entries                 — Scenario A ingestion        (Day 2)
- *   PUT  /api/entries/:id             — delta-routed update         (Day 3)
- *   POST /api/entries/search/similar  — vector similarity           (Day 3)
- *
- * GET list/detail/vectors are additive conveniences for the dashboard and for
- * verification; the spec does not mandate them (noted in DECISIONS.md).
+ * POST /, PUT /:id and POST /search/similar are the spec-fixed paths; the
+ * GETs are additive conveniences for the dashboard and for verification.
  */
 export class EntryRouter {
   constructor({ entryController }) {
@@ -23,8 +17,7 @@ export class EntryRouter {
   #mount() {
     this.router.post('/', this.#handle(this.controller.create));
     this.router.get('/', this.#handle(this.controller.list));
-    // Mounted before the parameterised routes so 'search' can never be
-    // captured as an :id.
+    // Before the parameterised routes so 'search' is never captured as an :id.
     this.router.post('/search/similar', this.#handle(this.controller.searchSimilar));
     this.router.get('/:id/vectors', this.#handle(this.controller.getVectors));
     this.router.get('/:id', this.#handle(this.controller.getById));

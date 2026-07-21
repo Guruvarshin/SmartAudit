@@ -12,11 +12,8 @@ import { EntryVectorsRepository } from '../src/repositories/EntryVectorsReposito
 import { SimilaritySearchService } from '../src/services/SimilaritySearchService.js';
 
 /**
- * Tests for POST /api/entries/search/similar. The fixture plants a
- * near-duplicate cluster (same vendor, amount, day; cosmetically varied
- * descriptions) among unrelated background entries — the deterministic
- * feature-hashed vectors must place the cluster together in cosine space, so
- * the search's job is to find the planted neighbours, not noise.
+ * The fixture plants a near-duplicate cluster among unrelated entries, so the
+ * search's job is to find planted neighbours rather than noise.
  */
 
 const CURRENT_VERSIONS = Object.freeze({

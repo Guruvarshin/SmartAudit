@@ -12,7 +12,5 @@ Thumbs.db
 .vscode/
 .claude/
 
-# The assessment brief, in either form. Reference material held locally,
-# never part of the deliverable.
 SPEC.md
 *.pdf

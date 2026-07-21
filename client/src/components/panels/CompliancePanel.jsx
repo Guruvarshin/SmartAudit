@@ -2,7 +2,6 @@ import React from 'react';
 import { Format } from '../../util/Format.js';
 import { ComplianceBadge, SeverityBadge } from '../Badges.jsx';
 
-/** Compliance outcome + flags (Scenario D's other mutable half, alongside risk). */
 export class CompliancePanel extends React.Component {
   render() {
     const { compliance } = this.props;

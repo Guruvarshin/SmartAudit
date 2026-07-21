@@ -18,18 +18,13 @@ import {
 const MS_PER_DAY = 86400000;
 
 /**
- * Generates a realistic journal-entry ledger with deliberately planted audit
- * signal.
+ * Generates a ledger with deliberately planted audit signal, so detection has
+ * something real to find — uniformly clean data would let a risk scorer that
+ * returns a constant look correct.
  *
- * The point of the planted cohorts is that Day 2's worker must have something
- * real to detect. A seed of uniformly clean entries would let a risk scorer
- * that returns a constant look correct.
- *
- * Cohort tags are tracked alongside the documents rather than written onto
- * them: the entry schema is `strict` and contains exactly the spec's baseline
- * fields plus the analytical layer, and the seed has no business adding to it.
- * Detection is the worker's job — the tags exist only to report what was
- * planted, so the two can be compared.
+ * Cohort tags are tracked alongside the documents, never written onto them:
+ * detection is the worker's job, and the tags exist only to report what was
+ * planted so the two can be compared.
  */
 export class EntryFactory {
   constructor({ seed, count }) {
@@ -40,20 +35,16 @@ export class EntryFactory {
     this.seedHex = (seed >>> 0).toString(16).padStart(8, '0').slice(-8);
   }
 
-  /**
-   * @returns {{ documents: object[], tags: string[][] }} documents in insertion
-   * order, and the cohort tags planted in each (parallel array).
-   */
+  /** Returns documents in insertion order plus a parallel array of cohort tags. */
   build() {
     const documents = [];
     const tags = [];
     const plan = this.#buildCohortPlan();
 
     // Near-duplicates only mean anything as a group, so they are budgeted as a
-    // total document count and then emitted as whole clusters. They are pulled
-    // out of the plan first: expanding them in place would let each cluster
-    // consume the slots of whatever cohorts happened to follow it, silently
-    // inflating this cohort and starving the others.
+    // document count and emitted as whole clusters. Pulled out of the plan
+    // first because expanding in place would let a cluster consume the slots
+    // of whatever cohorts followed it.
     const nearDuplicateBudget = plan.filter((c) => c === Cohort.NEAR_DUPLICATE).length;
     const singles = plan.filter((c) => c !== Cohort.NEAR_DUPLICATE);
 
@@ -78,9 +69,6 @@ export class EntryFactory {
     return { documents, tags };
   }
 
-  // ---------------------------------------------------------------------------
-  // Cohort planning
-  // ---------------------------------------------------------------------------
 
   #buildCohortPlan() {
     const plan = [];
@@ -94,9 +82,6 @@ export class EntryFactory {
     return this.rng.shuffle(plan);
   }
 
-  // ---------------------------------------------------------------------------
-  // Entry construction
-  // ---------------------------------------------------------------------------
 
   #createEntry(cohort) {
     const appliedTags = [cohort];
@@ -213,20 +198,14 @@ export class EntryFactory {
       updated: created,
       systemCreated,
       uploadSourceType: this.#uploadSourceType()
-      // `analytics` and `auditMeta` are intentionally omitted — schema defaults
-      // leave enrichment at `pending`, which is exactly the state Day 2's
-      // worker needs to find on first run.
+      // `analytics` and `auditMeta` are omitted so schema defaults leave
+      // enrichment at `pending` — the state the worker needs to find.
     };
   }
 
-  // ---------------------------------------------------------------------------
-  // Debit / credit construction
-  //
-  // Balance interpretation (see DECISIONS.md, Day 1): each row is a single-sided
-  // ledger line, balanced when `debit + credit === amount` with exactly one side
-  // non-zero. That reading keeps SPEC.md's own §2 example (debit 125000, credit
-  // 0, amount 125000) clean, which is plainly its intent.
-  // ---------------------------------------------------------------------------
+  // Each row is a single-sided ledger line, balanced when debit + credit
+  // equals amount with exactly one side non-zero. That reading keeps the
+  // spec's own example entry clean.
 
   #balancedSides(amount, account) {
     // Revenue (6xxxxx) and liability (2xxxxx) accounts are credited; asset and

@@ -1,10 +1,7 @@
 import React from 'react';
 import { ENRICHMENT_STATUSES, RISK_TIERS } from '../domain/constants.js';
 
-/**
- * Server-side filters (?tier=&status=) plus the poll indicator, so the async
- * refresh loop is visible rather than mysterious.
- */
+/** Server-side filters, plus a poll indicator so the refresh loop is visible. */
 export class EntryFilters extends React.Component {
   constructor(props) {
     super(props);

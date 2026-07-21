@@ -4,17 +4,13 @@ import { PartialEvaluationService } from './PartialEvaluationService.js';
 import { VectorGenerator } from './VectorGenerator.js';
 
 /**
- * Orchestrates the FULL intelligence pipeline for one journal entry: the
- * simulated model delay, the risk half (delegated to PartialEvaluationService
- * so scoring has exactly one implementation), the vector half, and the ordered
- * two-collection write.
+ * The full pipeline: risk (delegated to PartialEvaluationService so scoring
+ * has one implementation) plus vectors, and the ordered two-collection write.
  *
- * Write order is the Day 1 commit-point design (no cross-collection
- * transaction, by decision): vectors are upserted first, then a single fenced
- * $set lands the analytics AND flips enrichment.status to complete. The status
- * flip is the commit point — until it lands, the entry still reads as
- * processing and a crashed run is simply reclaimed after its lease and re-run
- * idempotently. No partial state is ever readable as complete.
+ * There is no cross-collection transaction. Vectors are written first, then a
+ * single fenced $set lands the analytics and flips status to complete — that
+ * flip is the commit point, so a crashed run is simply reclaimed after its
+ * lease and re-run, and no partial state is ever readable as complete.
  */
 export class EnrichmentService {
   constructor({
@@ -29,23 +25,14 @@ export class EnrichmentService {
     this.delayMs = delayMs;
     this.logger = logger;
 
-    // The risk half. Injectable so the worker can share one instance (and its
-    // baseline cache) between full and partial jobs.
+    // Injectable so the worker can share one instance, and its baseline cache,
+    // between full and partial jobs.
     this.partialEvaluationService =
       partialEvaluationService ?? new PartialEvaluationService({ entryRepository, delayMs });
     this.vectorGenerator = new VectorGenerator();
   }
 
-  /**
-   * Runs the pipeline for a claimed job. Outcome is 'complete' when the fenced
-   * commit landed, or 'discarded' when the fence rejected it (this worker's
-   * claim expired and another worker took the job — the correct response is
-   * to drop our result on the floor and move on). Artifacts are returned
-   * either way so the caller can log what was computed without re-reading.
-   *
-   * @param {object} entry the claimed entry document
-   * @returns {Promise<{ outcome: 'complete' | 'discarded', artifacts: object }>}
-   */
+  /** 'discarded' means the fence rejected the commit: another worker owns the job now. */
   async process(entry) {
     const claim = {
       claimedAt: entry.analytics.enrichment.claimedAt,
@@ -68,10 +55,8 @@ export class EnrichmentService {
   }
 
   /**
-   * Enriches an entry outside the queue, without claim or fence — used by the
-   * seed's --enrich-historical mode to backfill records as if a previous model
-   * generation had processed them. Same engines, same write shape, different
-   * version stamps; deliberately NOT a second implementation of enrichment.
+   * Enriches outside the queue, for the seed's historical backfill. Same
+   * engines and write shape as a real run, only the version stamps differ.
    */
   async enrichDirect(entry, { versions, skipDelay = true }) {
     const artifacts = await this.compute(entry, { simulateModelDelay: !skipDelay });
@@ -83,20 +68,10 @@ export class EnrichmentService {
   }
 
   /**
-   * Scenario C: re-enriches one stale entry at the CURRENT model versions,
-   * with both writes guarded so a concurrently running worker (whose result
-   * is computed from fresher content) is never clobbered:
-   *
-   *  - the vector replace lands only while the stored vector doc is still at
-   *    a superseded version;
-   *  - the analytics $set lands only while analytics.risk.modelVersion still
-   *    reads the stale version this migration pass scanned.
-   *
-   * Both writes are idempotent and independently guarded, so a crash between
-   * them re-converges on the next run: the entry still scans as stale, the
-   * already-migrated half's guard simply misses, and the missing half lands.
-   *
-   * @returns {Promise<{ vectorsUpdated: boolean, analyticsUpdated: boolean }>}
+   * Re-enriches one stale entry at the current model versions. Both writes
+   * are independently guarded on the stale stamp still being in place, so a
+   * concurrent worker is never clobbered and a crash between them
+   * re-converges on the next run.
    */
   async migrateStale(entry, { fromRiskVersion }) {
     const artifacts = await this.compute(entry, { simulateModelDelay: false });
@@ -119,14 +94,10 @@ export class EnrichmentService {
     return { vectorsUpdated, analyticsUpdated };
   }
 
-  /**
-   * The computation half, shared by every path: simulated ML delay, then the
-   * risk half (baseline, anomalies, score, compliance) plus the vectors.
-   */
+  /** Pure computation, shared by every path — no writes. */
   async compute(entry, { simulateModelDelay }) {
     if (simulateModelDelay) {
-      // SPEC.md Scenario A: the intelligence pipeline simulates a machine
-      // learning model execution with an explicit delay.
+      // Stands in for a real model execution (spec: Scenario A).
       await sleep(this.delayMs);
     }
 

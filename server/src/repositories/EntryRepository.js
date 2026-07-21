@@ -1,23 +1,7 @@
 import { EnrichmentStatus } from '../domain/Constants.js';
 import { Entry } from '../models/Entry.js';
 
-/**
- * All reads and mutations against the `entries` collection.
- *
- * Every mutation uses direct, targeted update operators ($set / $inc) on
- * explicit paths — never a whole-document save() — per the spec's constraint
- * on avoiding root document rewrites. This class is also where the queue
- * lives: the entry document *is* the job record (see DECISIONS.md Day 2), so
- * claim / complete / release / fail are repository methods like any other
- * mutation.
- */
 export class EntryRepository {
-  /**
-   * Creating an entry and enqueueing its enrichment are the same single write:
-   * the schema defaults land it at enrichment.status 'pending', which is the
-   * claimable state. No separate enqueue step means no "created but never
-   * queued" window to defend.
-   */
   async insert(fields) {
     const document = await Entry.create(fields);
     return document.toObject();
@@ -27,7 +11,6 @@ export class EntryRepository {
     return Entry.findById(id).lean();
   }
 
-  /** Batch fetch for hydrating similarity-search results. */
   async findByIds(ids) {
     if (ids.length === 0) return [];
     return Entry.find({ _id: { $in: ids } }).lean();
@@ -41,27 +24,17 @@ export class EntryRepository {
   }
 
   /**
-   * Executes an UpdatePlanner plan as ONE targeted updateOne — baseline
-   * $sets, auditMeta $set/$push, and (for Scenarios B/D) the re-enqueue flip,
-   * all in the same atomic write. There is no window where the new field
-   * values exist but the recompute isn't queued.
+   * Field updates and the re-enqueue flip land in ONE write, so there is no
+   * window where new values exist but the recompute is not queued.
    *
-   * Concurrency, layered:
-   *  - the filter on `updated` is optimistic concurrency (CAS): it races only
-   *    against genuine content writes, because queue bookkeeping deliberately
-   *    never bumps `updated` (Day 2). A miss returns false and the service
-   *    re-plans from a fresh read.
-   *  - the re-enqueue $set drops status back to `pending` even if a worker is
-   *    mid-run on the OLD values. That deliberately breaks the running claim's
-   *    fence (status no longer `processing`), so the stale result is discarded
-   *    and the job is re-claimed with the new content — Day 2's fence working
-   *    in a new direction, not a new mechanism.
-   *  - `attempts` resets to 0: a re-enqueue is a fresh job generation with a
-   *    fresh retry budget (otherwise historical failures permanently erode
-   *    WORKER_MAX_ATTEMPTS). A zombie's fence still fails on status +
-   *    claimedAt; colliding would need a reclaim in the same millisecond.
+   * The `updated` filter is optimistic concurrency: it races only against
+   * content writes, since queue bookkeeping never bumps `updated`. Returns
+   * false on a miss so the caller can re-plan from a fresh read.
    *
-   * @returns {Promise<boolean>} false when the CAS filter missed
+   * Dropping status back to `pending` mid-run deliberately breaks the running
+   * claim's fence, so a stale in-flight result is discarded rather than
+   * committed over the new content. `attempts` resets because a re-enqueue is
+   * a new job generation and deserves a fresh retry budget.
    */
   async applyUpdatePlan(entryId, expectedUpdated, plan) {
     const $set = { ...plan.baselineSet, ...plan.auditMetaSet };
@@ -87,28 +60,13 @@ export class EntryRepository {
     return result.matchedCount === 1;
   }
 
-  // ---------------------------------------------------------------------------
-  // Job queue — atomic claim, lease, fenced completion.
-  // ---------------------------------------------------------------------------
-
   /**
-   * Atomically claims the next enrichable entry, or returns null when none is
-   * claimable.
+   * Atomic claim: MongoDB applies this filter-and-update to a single document
+   * indivisibly, so racing workers cannot claim the same job.
    *
-   * This single findOneAndUpdate IS the race-condition mitigation for
-   * concurrent claims: MongoDB executes the filter-and-update atomically on a
-   * single document, so of N workers (or in-process lanes) racing, one gets
-   * the document and the rest match a different document or nothing. No lock,
-   * no coordinator, no double-claim.
-   *
-   * The second $or branch is crash recovery: a claim older than `leaseMs`
-   * whose status never advanced belongs to a worker presumed dead, and the job
-   * becomes claimable again (lease / visibility-timeout pattern). Every
-   * pipeline write is idempotent, so re-running over a dead worker's partial
-   * writes is safe.
-   *
-   * The claim stamps (claimedAt, attempts) travel with the job as its fence
-   * token — see #fence below.
+   * The second $or branch is crash recovery — a claim older than the lease
+   * belongs to a presumed-dead worker and becomes claimable again. Safe
+   * because every pipeline write is idempotent.
    */
   async claimNextJob({ leaseMs }) {
     const now = new Date();
@@ -131,19 +89,16 @@ export class EntryRepository {
         },
         $inc: { 'analytics.enrichment.attempts': 1 }
       },
-      // timestamps: false — claiming is queue bookkeeping, not a record edit;
-      // it must not masquerade as one by bumping the spec's `updated` field.
+      // Claiming is queue bookkeeping, not a record edit — it must not bump `updated`.
       { sort: { _id: 1 }, returnDocument: 'after', lean: true, timestamps: false }
     );
   }
 
   /**
-   * Fence filter: the terminal write of a job only lands if the claim is still
-   * *ours*. If this worker outlived its lease and the job was reclaimed,
-   * claimedAt/attempts have moved on, the filter matches nothing, and the
-   * zombie's write is discarded. `attempts` increments on every claim, so it
-   * is a monotonic fencing token; claimedAt alone could only collide across a
-   * full lease interval, which the attempts check closes anyway.
+   * Restricts a terminal write to the worker that still holds the claim. A
+   * worker that outlived its lease will find claimedAt/attempts moved on, so
+   * its write matches nothing and is discarded instead of clobbering the
+   * rightful owner's result.
    */
   #fence(entryId, claim) {
     return {
@@ -155,16 +110,8 @@ export class EntryRepository {
   }
 
   /**
-   * Writes the computed analytics and flips the entry to complete, in one
-   * targeted, fenced $set. This is the job's commit point (DECISIONS.md Day 1:
-   * ordering, not transactions): vectors were already upserted, and nothing is
-   * readable as complete until this write lands.
-   *
-   * Touches analytics.* paths only — auditMeta and every baseline field are
-   * structurally outside this update, and vectors live in another collection
-   * entirely.
-   *
-   * @returns {boolean} false when the fence rejected the write (claim lost)
+   * The job's commit point. Vectors are already written; nothing is readable
+   * as complete until this lands. Touches analytics.* paths only.
    */
   async completeEnrichment(entryId, claim, { risk, compliance, anomalies, anomalyModelVersion }) {
     const result = await Entry.updateOne(this.#fence(entryId, claim), {
@@ -181,10 +128,6 @@ export class EntryRepository {
     return result.matchedCount === 1;
   }
 
-  /**
-   * Returns a failed job to the queue for another attempt (fenced, so a
-   * zombie cannot release a job it no longer owns).
-   */
   async releaseForRetry(entryId, claim, error) {
     const result = await Entry.updateOne(
       this.#fence(entryId, claim),
@@ -199,7 +142,6 @@ export class EntryRepository {
     return result.matchedCount === 1;
   }
 
-  /** Poison-job cutoff: parks the entry as failed instead of retrying forever. */
   async failEnrichment(entryId, claim, error) {
     const result = await Entry.updateOne(
       this.#fence(entryId, claim),
@@ -215,10 +157,9 @@ export class EntryRepository {
   }
 
   /**
-   * Unfenced enrichment write for paths that run outside the queue entirely —
-   * today that is only the seed's --enrich-historical backfill, which runs
-   * before any worker exists and therefore has no claim to fence against.
-   * Not for worker use: workers must go through completeEnrichment's fence.
+   * Unfenced write for the seed's historical backfill, which runs before any
+   * worker exists and so has no claim to fence against. Workers must use
+   * completeEnrichment instead.
    */
   async forceEnrichmentResult(entryId, { risk, compliance, anomalies, anomalyModelVersion }) {
     await Entry.updateOne(
@@ -234,17 +175,11 @@ export class EntryRepository {
           'analytics.enrichment.lastError': null
         }
       },
-      // Historical backfill must not stamp today's date onto records that are
-      // meant to read as months-old ledger history.
+      // Backfilled records must keep their historical dates.
       { timestamps: false }
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Scenario C / D batch scans and guarded writes
-  // ---------------------------------------------------------------------------
-
-  /** Every risk model version present in the collection (null = never enriched). */
   async distinctRiskModelVersions() {
     return Entry.distinct('analytics.risk.modelVersion');
   }
@@ -257,13 +192,12 @@ export class EntryRepository {
   }
 
   /**
-   * One keyset page of completed entries stamped at a given (stale) risk
-   * model version. Equality on the version plus a range on _id rides the
-   * `risk_model_version_scan` compound index directly — no `.skip()`, no
-   * scanned-and-discarded rows, memory bounded by the batch.
+   * Keyset page: equality on the version plus a range on _id rides the
+   * risk_model_version_scan index, so no rows are scanned and discarded and
+   * memory stays bounded by the batch. Deliberately not `.skip()`.
    *
-   * Only `complete` entries page in: a pending/processing entry is about to be
-   * stamped with current versions by whichever worker completes it.
+   * Only settled entries page in; an in-flight one gets current stamps from
+   * whichever worker completes it.
    */
   async pageByRiskModelVersion(version, afterId, batchSize) {
     const filter = {
@@ -274,11 +208,6 @@ export class EntryRepository {
     return Entry.find(filter).sort({ _id: 1 }).limit(batchSize).lean();
   }
 
-  /**
-   * One keyset page across ALL completed entries (the Scenario D bulk scan —
-   * a context shift stales every risk evaluation, whatever its version).
-   * Pages on the _id index itself.
-   */
   async pageCompleteEntries(afterId, batchSize) {
     const filter = { 'analytics.enrichment.status': EnrichmentStatus.COMPLETE };
     if (afterId) filter._id = { $gt: afterId };
@@ -286,16 +215,10 @@ export class EntryRepository {
   }
 
   /**
-   * Scenario C's analytics write: targeted $set, guarded on the stale version
-   * still being in place. If a live worker re-stamped the entry after this
-   * migration pass read it, the guard misses and the worker's fresher result
-   * stands — the migration never clobbers a concurrent recompute.
-   *
-   * timestamps: false — a model upgrade rewrites analytics, not ledger
-   * content; months-old entries must not surface as freshly edited. The
-   * witness that migration ran is analytics.risk.computedAt, which does move.
-   *
-   * @returns {Promise<boolean>} false when the guard rejected the write
+   * Guarded on the stale version still being in place, so a worker that
+   * re-stamped this entry after the migration read it keeps its fresher
+   * result. `timestamps: false` because a model upgrade is analytics churn,
+   * not a ledger edit; analytics.risk.computedAt is the witness that it ran.
    */
   async applyMigratedAnalytics(entryId, fromRiskVersion, { risk, compliance, anomalies, anomalyModelVersion }) {
     const result = await Entry.updateOne(
@@ -318,11 +241,9 @@ export class EntryRepository {
   }
 
   /**
-   * Scenario D's bulk write: same targeted analytics $set, guarded only on
-   * the entry still being settled (`complete`) — an in-flight recompute owns
-   * the entry and will apply the current thresholds itself. Touches
-   * analytics.* only; this method (and everything that calls it) has no path
-   * to the vectors collection.
+   * Guarded only on the entry being settled — an in-flight recompute owns the
+   * entry and will apply current thresholds itself. Touches analytics.* only;
+   * nothing on this path can reach the vectors collection.
    */
   async applyReEvaluatedAnalytics(entryId, { risk, compliance, anomalies, anomalyModelVersion }) {
     const result = await Entry.updateOne(
@@ -340,14 +261,7 @@ export class EntryRepository {
     return result.matchedCount === 1;
   }
 
-  // ---------------------------------------------------------------------------
-  // Reads in service of enrichment
-  // ---------------------------------------------------------------------------
-
-  /**
-   * Amounts posted to the same GL account within the same company — the
-   * population the numeric-outlier detector measures against.
-   */
+  /** The population the numeric-outlier detector measures an amount against. */
   async amountsForAccount(companyId, glNumber, { limit = 1000 } = {}) {
     const rows = await Entry.find({ companyId, glNumber }, { amount: 1, _id: 0 })
       .limit(limit)

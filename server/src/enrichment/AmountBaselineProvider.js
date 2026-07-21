@@ -1,20 +1,16 @@
 /**
- * Robust log-scale amount statistics per (companyId, glNumber) population,
- * with a short in-process TTL cache.
+ * Log-scale amount statistics per (companyId, glNumber), TTL-cached.
  *
- * Median + MAD rather than mean + stddev: the outliers being hunted are 50-200x
- * the typical posting, large enough to drag a mean-based baseline toward
- * themselves and mask their own detection. The median is indifferent to them.
- *
- * The cache exists because a drain of N pending entries would otherwise run N
- * baseline queries against ~20 distinct populations. Thirty seconds of
- * staleness in a statistical baseline is immaterial; N-to-20 query reduction
- * is not.
+ * Median + MAD rather than mean + stddev: the outliers being hunted are large
+ * enough to drag a mean-based baseline toward themselves and mask their own
+ * detection. The cache matters because draining N entries would otherwise run
+ * N queries against a couple of dozen distinct populations, and brief
+ * staleness in a statistical baseline is immaterial.
  */
 export class AmountBaselineProvider {
   static #TTL_MS = 30000;
 
-  /** 1.4826 scales MAD to estimate sigma under normality — the standard consistency constant. */
+  /** Scales MAD to estimate sigma under normality. */
   static #MAD_SIGMA = 1.4826;
 
   constructor({ entryRepository }) {
@@ -22,9 +18,6 @@ export class AmountBaselineProvider {
     this.cache = new Map();
   }
 
-  /**
-   * @returns {{ count: number, medianLog: number, sigmaLog: number } | null}
-   */
   async baselineFor(companyId, glNumber) {
     const key = `${companyId}:${glNumber}`;
     const cached = this.cache.get(key);

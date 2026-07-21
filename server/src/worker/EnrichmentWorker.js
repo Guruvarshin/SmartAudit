@@ -2,17 +2,10 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { EnrichmentReason, FULL_RECOMPUTE_REASONS } from '../domain/Constants.js';
 
 /**
- * The background enrichment worker — SPEC.md Scenario A's asynchronous
- * processing layer.
- *
- * Design (see DECISIONS.md Day 2): there is no queue infrastructure to talk
- * to. The worker runs `concurrency` independent lanes, each looping:
- * atomically claim the next claimable entry via the repository's
- * findOneAndUpdate (the race-condition mitigation — two lanes, or two whole
- * worker processes, can never claim the same document), process it, commit
- * through the fenced write. When a claim comes back empty the lane sleeps
- * `pollIntervalMs` and looks again — poll-and-drain, correct on standalone
- * mongod and Atlas alike, no change streams required.
+ * Runs `concurrency` independent lanes, each claiming one entry at a time and
+ * sleeping `pollIntervalMs` when the queue is empty. Poll-and-drain rather
+ * than change streams, so it is correct on standalone mongod as well as a
+ * replica set. Multiple worker processes are safe to run side by side.
  */
 export class EnrichmentWorker {
   constructor({
@@ -85,9 +78,8 @@ export class EnrichmentWorker {
     const claim = { claimedAt: enrichment.claimedAt, attempts: enrichment.attempts };
     const startedAt = Date.now();
 
-    // The job's reason selects the pipeline (SPEC.md Scenario D): full-recompute
-    // reasons run vectors + risk; context_shift runs the partial evaluation
-    // service, which holds no handle to the vectors collection at all.
+    // The reason selects the pipeline: full-recompute reasons run vectors +
+    // risk, context_shift runs the partial service, which cannot reach vectors.
     const reason = enrichment.reason ?? EnrichmentReason.CREATE;
     const fullPipeline = FULL_RECOMPUTE_REASONS.includes(reason);
     const pipeline = fullPipeline ? this.enrichmentService : this.partialEvaluationService;
@@ -102,8 +94,8 @@ export class EnrichmentWorker {
       const ms = Date.now() - startedAt;
 
       if (outcome === 'discarded') {
-        // Our lease expired mid-run and another worker took the job; the fence
-        // rejected our commit. Their result stands, ours is dropped — correct.
+        // Our claim was superseded mid-run and the fence rejected the commit;
+        // the other worker's result stands.
         this.stats.discarded += 1;
         this.logger.log(`${tag} DISCARDED ${entry._id} — claim superseded during run (${ms}ms)`);
         return;
@@ -139,7 +131,7 @@ export class EnrichmentWorker {
       this.stats.retried += 1;
       this.logger.log(`${tag} released ${entry._id} for retry`);
     }
-    // If neither write matched, the fence rejected us: the job is someone
-    // else's now, and their run — not our bookkeeping — decides its fate.
+    // If neither write matched, the fence rejected us and the job now belongs
+    // to another worker, whose run decides its fate.
   }
 }

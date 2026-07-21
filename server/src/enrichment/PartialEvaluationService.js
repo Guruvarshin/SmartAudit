@@ -6,23 +6,15 @@ import { ComplianceEvaluator } from './ComplianceEvaluator.js';
 import { RiskScorer } from './RiskScorer.js';
 
 /**
- * The cheap half of the intelligence pipeline: anomaly signals, risk score,
- * compliance flags — everything EXCEPT vectors.
+ * Anomaly signals, risk score and compliance flags — everything except vectors.
  *
- * This class exists so Scenario D is structurally incapable of touching the
- * vector layer (DECISIONS.md Day 1: "the risk/compliance path must never
- * import EntryVectors"). It imports neither the EntryVectors model nor its
- * repository, so no code path that runs through here — the worker's
- * context_shift jobs, or the bulk reevaluate:risk script — can reach the
- * expensive embeddings even by accident. EnrichmentService composes this class
- * for its risk half, so there is exactly one implementation of scoring, not a
- * full and a partial copy that could drift.
+ * This class deliberately imports neither the EntryVectors model nor its
+ * repository. That import boundary is what makes it impossible for a
+ * risk-only re-evaluation to touch the vector layer, rather than merely
+ * unlikely. EnrichmentService composes it, so scoring has one implementation.
  *
- * Anomaly signals are recomputed here too, not just the risk/compliance
- * scalars: the score is a function of the signals, and a threshold shift
- * (APPROVAL_THRESHOLD, RiskThresholds) changes which signals fire. The spec's
- * boundary is cheap analytics vs expensive vectors, and signals sit on the
- * cheap side.
+ * Anomaly signals are recomputed here too, not just the scalars: the score is
+ * a function of the signals, and a threshold shift changes which ones fire.
  */
 export class PartialEvaluationService {
   constructor({ entryRepository, delayMs = 0 }) {
@@ -36,13 +28,8 @@ export class PartialEvaluationService {
   }
 
   /**
-   * Runs the partial pipeline for a claimed context_shift job and commits it
-   * through the same fenced write as a full run. completeEnrichment touches
-   * analytics.* paths only, so the "vectors entirely untouched" guarantee is
-   * carried by both the import boundary of this class and the shape of the
-   * terminal write.
-   *
-   * @returns {Promise<{ outcome: 'complete' | 'discarded', artifacts: object }>}
+   * Commits through the same fenced write as a full run; that write touches
+   * analytics.* paths only.
    */
   async process(entry) {
     const claim = {
@@ -63,14 +50,6 @@ export class PartialEvaluationService {
     return { outcome: committed ? 'complete' : 'discarded', artifacts };
   }
 
-  /**
-   * Pure computation: baseline fetch, anomaly signals, risk score, compliance
-   * flags. EnrichmentService calls this for its risk half (with the delay
-   * already served on its side); the bulk reevaluate:risk script calls it with
-   * no delay at all.
-   *
-   * @returns {Promise<{ anomalies: object[], risk: object, compliance: object }>}
-   */
   async compute(entry, { simulateModelDelay = false } = {}) {
     if (simulateModelDelay) {
       await sleep(this.delayMs);
@@ -84,11 +63,7 @@ export class PartialEvaluationService {
     return { anomalies, risk, compliance };
   }
 
-  /**
-   * Shapes computed artifacts into the analytics sub-document written by
-   * completeEnrichment / applyReEvaluatedAnalytics. Shared with
-   * EnrichmentService so full and partial runs land byte-compatible analytics.
-   */
+  /** Shared with EnrichmentService so full and partial runs land the same shape. */
   analyticsPayload(artifacts, versions) {
     const computedAt = new Date();
     return {

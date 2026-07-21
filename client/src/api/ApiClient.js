@@ -1,7 +1,6 @@
 /**
- * Error thrown for any non-2xx API response, carrying the HTTP status and the
- * backend's `{ error, details }` body so components can branch on status
- * (e.g. the 409 CAS-conflict reload path) without string-matching messages.
+ * Carries the HTTP status so components can branch on it — notably the 409
+ * conflict reload path — without string-matching error messages.
  */
 export class ApiError extends Error {
   constructor(status, message, details = null) {
@@ -13,12 +12,10 @@ export class ApiError extends Error {
 }
 
 /**
- * The client's single HTTP seam. All URLs are relative (/api/...) — the Vite
- * dev server proxies them to the Express API, so the browser stays
- * same-origin and the backend needs no CORS.
+ * URLs are relative because the Vite dev server proxies /api to the Express
+ * API, keeping the browser same-origin so the backend needs no CORS.
  */
 export class ApiClient {
-  /** GET /api/entries?limit&tier&status → Entry[] */
   async listEntries({ limit = 200, tier = null, status = null } = {}) {
     const params = new URLSearchParams({ limit: String(limit) });
     if (tier) params.set('tier', tier);
@@ -26,22 +23,19 @@ export class ApiClient {
     return this.#request(`/api/entries?${params}`);
   }
 
-  /** GET /api/entries/:id → Entry */
   async getEntry(id) {
     return this.#request(`/api/entries/${id}`);
   }
 
-  /** POST /api/entries → 201 Entry (born enrichment.status 'pending') */
   async createEntry(fields) {
     return this.#request('/api/entries', { method: 'POST', body: fields });
   }
 
-  /** PUT /api/entries/:id → { routing: { scenario, action, changedFields }, entry } */
+  /** Responds { routing, entry }. */
   async updateEntry(id, changes) {
     return this.#request(`/api/entries/${id}`, { method: 'PUT', body: changes });
   }
 
-  /** POST /api/entries/search/similar → { entryId, strategy, results } */
   async searchSimilar(entryId, strategy) {
     return this.#request('/api/entries/search/similar', {
       method: 'POST',
@@ -49,7 +43,6 @@ export class ApiClient {
     });
   }
 
-  /** GET /api/entries/:id/vectors → { modelVersion, stale, sourceHash, dims, spaces } */
   async getVectors(id) {
     return this.#request(`/api/entries/${id}/vectors`);
   }
@@ -67,7 +60,7 @@ export class ApiClient {
     try {
       payload = await response.json();
     } catch {
-      // Non-JSON body (proxy failure page, empty response) — fall through.
+      // Non-JSON body (proxy failure page, empty response).
     }
 
     if (!response.ok) {

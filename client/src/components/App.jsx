@@ -2,10 +2,7 @@ import React from 'react';
 import { ApiClient } from '../api/ApiClient.js';
 import { AuditDashboard } from './AuditDashboard.jsx';
 
-/**
- * Application shell: navbar, top-level error boundary, and the single
- * ApiClient instance the whole tree shares.
- */
+/** Shell, top-level error boundary, and the ApiClient the tree shares. */
 export class App extends React.Component {
   constructor(props) {
     super(props);

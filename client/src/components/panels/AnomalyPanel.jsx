@@ -1,7 +1,7 @@
 import React from 'react';
 import { SeverityBadge } from '../Badges.jsx';
 
-/** Granular anomaly signals — each names its type AND the field it fired on (SPEC.md §3.2). */
+/** Each signal names both its type and the field it fired on. */
 export class AnomalyPanel extends React.Component {
   render() {
     const { anomalies } = this.props;

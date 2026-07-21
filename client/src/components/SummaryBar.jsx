@@ -1,6 +1,5 @@
 import React from 'react';
 
-/** Headline counts over the currently listed entries. */
 export class SummaryBar extends React.Component {
   render() {
     const { entries } = this.props;

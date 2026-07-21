@@ -8,7 +8,7 @@ import {
   WorkflowBadge
 } from './Badges.jsx';
 
-/** One ledger row; tier drives the row colour (SPEC.md §4 colour-coding). */
+/** Risk tier drives the row colour. */
 export class EntryRow extends React.Component {
   constructor(props) {
     super(props);
@@ -58,7 +58,6 @@ export class EntryRow extends React.Component {
   }
 }
 
-/** The ledger table. Rows open the diagnostics modal. */
 export class EntryTable extends React.Component {
   render() {
     const { entries, onOpenEntry } = this.props;

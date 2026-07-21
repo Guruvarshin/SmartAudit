@@ -2,18 +2,13 @@ import { ModelVersion } from '../domain/Constants.js';
 import { KeysetPager } from '../util/KeysetPager.js';
 
 /**
- * Scenario D: the bulk partial-evaluation pass. When compliance rules or
- * internal thresholds shift (RiskThresholds, APPROVAL_THRESHOLD in
- * domain/Constants.js), every settled entry's risk score, compliance flags,
- * and anomaly signals are re-derived under the CURRENT context and written
- * with a targeted $set on analytics.* — while the expensive vectors stay
- * entirely untouched.
+ * Bulk re-evaluation for a threshold or compliance-rule shift: re-derives
+ * risk, compliance and anomaly signals for every settled entry via a targeted
+ * $set on analytics.*, leaving vectors untouched.
  *
- * "Untouched" is structural, not behavioural: this class composes
- * PartialEvaluationService and EntryRepository.applyReEvaluatedAnalytics,
- * neither of which imports the EntryVectors model or repository. There is no
- * code path from here to the vectors collection. The runtime witness is
- * entry_vectors.updated, which does not move across a run.
+ * That last part is structural, not behavioural — nothing this class composes
+ * imports the EntryVectors model or repository, so there is no code path from
+ * here to the vectors collection at all.
  */
 export class RiskReEvaluationService {
   constructor({ entryRepository, partialEvaluationService, batchSize, dryRun = false, logger = console }) {
