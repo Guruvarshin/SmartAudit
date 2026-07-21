@@ -14,6 +14,7 @@
     "start:worker": "npm --prefix server run start:worker",
     "start:client": "npm --prefix client run dev",
     "migrate:models": "npm --prefix server run migrate:models --",
+    "reevaluate:risk": "npm --prefix server run reevaluate:risk --",
     "test": "npm --prefix server test"
   }
 }

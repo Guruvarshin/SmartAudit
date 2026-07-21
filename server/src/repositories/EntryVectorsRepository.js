@@ -52,6 +52,32 @@ export class EntryVectorsRepository {
       .cursor({ batchSize: 200 });
   }
 
+  /**
+   * Scenario C's vector write: replaces the stored vectors ONLY while they
+   * are still stamped at a superseded version. If a live worker already wrote
+   * current-version vectors (necessarily computed from content at least as
+   * fresh as the migration's read), the guard misses and that write stands —
+   * the migration can never overwrite a newer computation with an older one.
+   *
+   * @returns {Promise<boolean>} false when the guard rejected the write
+   */
+  async replaceIfStale(entryId, companyId, vectors, currentModelVersion) {
+    const result = await EntryVectors.replaceOne(
+      { _id: entryId, modelVersion: { $ne: currentModelVersion } },
+      {
+        companyId,
+        semantic: vectors.semantic,
+        financial: vectors.financial,
+        entity: vectors.entity,
+        dims: vectors.dims,
+        norms: vectors.norms,
+        sourceHash: vectors.sourceHash,
+        modelVersion: currentModelVersion
+      }
+    );
+    return result.matchedCount === 1;
+  }
+
   async count() {
     return EntryVectors.countDocuments();
   }

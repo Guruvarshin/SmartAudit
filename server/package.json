@@ -8,6 +8,7 @@
     "start:server": "node src/server.js",
     "start:worker": "node src/worker/index.js",
     "migrate:models": "node src/scripts/migrateModels.js",
+    "reevaluate:risk": "node src/scripts/reevaluateRisk.js",
     "test": "node --test"
   },
   "dependencies": {

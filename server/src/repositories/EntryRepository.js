@@ -241,6 +241,106 @@ export class EntryRepository {
   }
 
   // ---------------------------------------------------------------------------
+  // Scenario C / D batch scans and guarded writes
+  // ---------------------------------------------------------------------------
+
+  /** Every risk model version present in the collection (null = never enriched). */
+  async distinctRiskModelVersions() {
+    return Entry.distinct('analytics.risk.modelVersion');
+  }
+
+  async countByRiskModelVersion(version) {
+    return Entry.countDocuments({
+      'analytics.risk.modelVersion': version,
+      'analytics.enrichment.status': EnrichmentStatus.COMPLETE
+    });
+  }
+
+  /**
+   * One keyset page of completed entries stamped at a given (stale) risk
+   * model version. Equality on the version plus a range on _id rides the
+   * `risk_model_version_scan` compound index directly — no `.skip()`, no
+   * scanned-and-discarded rows, memory bounded by the batch.
+   *
+   * Only `complete` entries page in: a pending/processing entry is about to be
+   * stamped with current versions by whichever worker completes it.
+   */
+  async pageByRiskModelVersion(version, afterId, batchSize) {
+    const filter = {
+      'analytics.risk.modelVersion': version,
+      'analytics.enrichment.status': EnrichmentStatus.COMPLETE
+    };
+    if (afterId) filter._id = { $gt: afterId };
+    return Entry.find(filter).sort({ _id: 1 }).limit(batchSize).lean();
+  }
+
+  /**
+   * One keyset page across ALL completed entries (the Scenario D bulk scan —
+   * a context shift stales every risk evaluation, whatever its version).
+   * Pages on the _id index itself.
+   */
+  async pageCompleteEntries(afterId, batchSize) {
+    const filter = { 'analytics.enrichment.status': EnrichmentStatus.COMPLETE };
+    if (afterId) filter._id = { $gt: afterId };
+    return Entry.find(filter).sort({ _id: 1 }).limit(batchSize).lean();
+  }
+
+  /**
+   * Scenario C's analytics write: targeted $set, guarded on the stale version
+   * still being in place. If a live worker re-stamped the entry after this
+   * migration pass read it, the guard misses and the worker's fresher result
+   * stands — the migration never clobbers a concurrent recompute.
+   *
+   * timestamps: false — a model upgrade rewrites analytics, not ledger
+   * content; months-old entries must not surface as freshly edited. The
+   * witness that migration ran is analytics.risk.computedAt, which does move.
+   *
+   * @returns {Promise<boolean>} false when the guard rejected the write
+   */
+  async applyMigratedAnalytics(entryId, fromRiskVersion, { risk, compliance, anomalies, anomalyModelVersion }) {
+    const result = await Entry.updateOne(
+      {
+        _id: entryId,
+        'analytics.risk.modelVersion': fromRiskVersion,
+        'analytics.enrichment.status': EnrichmentStatus.COMPLETE
+      },
+      {
+        $set: {
+          'analytics.risk': risk,
+          'analytics.compliance': compliance,
+          'analytics.anomalies': anomalies,
+          'analytics.anomalyModelVersion': anomalyModelVersion
+        }
+      },
+      { timestamps: false }
+    );
+    return result.matchedCount === 1;
+  }
+
+  /**
+   * Scenario D's bulk write: same targeted analytics $set, guarded only on
+   * the entry still being settled (`complete`) — an in-flight recompute owns
+   * the entry and will apply the current thresholds itself. Touches
+   * analytics.* only; this method (and everything that calls it) has no path
+   * to the vectors collection.
+   */
+  async applyReEvaluatedAnalytics(entryId, { risk, compliance, anomalies, anomalyModelVersion }) {
+    const result = await Entry.updateOne(
+      { _id: entryId, 'analytics.enrichment.status': EnrichmentStatus.COMPLETE },
+      {
+        $set: {
+          'analytics.risk': risk,
+          'analytics.compliance': compliance,
+          'analytics.anomalies': anomalies,
+          'analytics.anomalyModelVersion': anomalyModelVersion
+        }
+      },
+      { timestamps: false }
+    );
+    return result.matchedCount === 1;
+  }
+
+  // ---------------------------------------------------------------------------
   // Reads in service of enrichment
   // ---------------------------------------------------------------------------
 
