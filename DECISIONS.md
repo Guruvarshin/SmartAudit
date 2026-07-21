@@ -4,6 +4,8 @@ Maintained by Claude Code, one entry per architectural decision, appended at the
 
 Purpose: a fresh session (or a fresh subagent) should be able to read this file alone and know every non-obvious choice already made, without re-deriving it or contradicting it. If you're about to make a call that touches something already logged here, reconcile with the existing entry explicitly — don't silently override it.
 
+> **Note for reviewers:** entries below cite `SPEC.md` by section (e.g. "SPEC.md §3.3", "Scenario B"). That file is the verbatim assessment brief you provided; it is deliberately not committed to this repository, so those citations point into the brief itself rather than to a file in the clone.
+
 Entry format:
 
 ```
@@ -336,3 +338,40 @@ The log image is a **syntax-highlighted rendering** of captured worker output, n
 **Links to `SPEC.md` were removed and reworded as prose:** `.gitignore` excludes `SPEC.md`/`CLAUDE.md`/`DAY_PLAN.md` from the deliverable, so a reviewer's clone would have hit a dead link. `DECISIONS.md` *is* tracked, so the README links to it freely.
 
 **Affects:** `README.md`, `docs/media/*`.
+
+---
+
+## [Day 4] What I would change for production — deliberate scope boundaries, not oversights
+
+Recorded so the line between "assessment scope" and "what I actually think production needs" is explicit. Everything below was a conscious decision to stop, not something missed.
+
+**Security — the largest gap, and the one I would fix first.**
+There is no authentication or authorization anywhere. `companyId` and `userId` arrive in the `POST /api/entries` body and are trusted. Tenant isolation in the similarity search is enforced against *that* client-supplied value, which means the isolation is real in code but trivially bypassable by a caller who lies. Production needs authenticated sessions, `companyId` derived server-side from the principal rather than the payload, and per-tenant authorization checks in the repository layer. On a graded local run this would have been ceremony; on anything real it is the first requirement, not the last.
+
+Alongside it: no rate limiting, no request-size policy beyond the 256 KB JSON cap, no CORS policy (the client is same-origin via the dev proxy, which is a development-time answer, not a deployment one), and `MONGODB_URI` sits in a `.env` file rather than a secrets manager.
+
+**Ledger immutability is documented, not enforced.**
+The spec describes journal entries as immutable, and the `PUT` whitelist honours that in spirit — `entryNo`, `currency` and vendor identity are unwritable. But nothing at the database level prevents a direct mutation, and edits overwrite in place rather than appending a revision. A real audit system wants append-only history: every core-field change as a new immutable revision with the prior value retained, which is also what makes an audit trail defensible. That is a schema change, not a patch, which is why it was not attempted here.
+
+**The queue would eventually need to stop being a poll.**
+The MongoDB-native queue is the right call at this scale and I would defend it (see the Day 2 entry). Its ceiling is real though: poll-and-drain costs a query per lane per interval whether or not there is work, and at high job volume that becomes the dominant load. The upgrade path is ordered — first change streams to replace polling with push (the reason Day 1 kept the replica set even without depending on it), then an external broker only if throughput genuinely demands it. There is also no dead-letter *surface*: `failed` jobs are queryable but nothing alerts on them, and there is no retry-from-failed admin path.
+
+**No per-run job history** (already noted Day 2): the entry document holds latest-attempt state only. Production auditing of the pipeline itself — who recomputed what, when, under which model — needs a separate append-only run log.
+
+**Similarity search is O(n) per query.**
+The streaming scan is honest at 500 entries and would be wrong at a million. `entry_vectors` was deliberately shaped as the seam where Atlas Vector Search, pgvector, or a dedicated ANN index drops in without the ledger schema changing — that substitution is the intended next step, not a rewrite.
+
+**The AI is mocked, and the seams show where it matters.**
+Feature-hashed deterministic vectors and heuristic risk rules stand in for real models. Swapping in genuine embeddings changes two things beyond the obvious: the migration story gets much heavier (re-embedding a large ledger is a long, resumable, rate-limited job rather than a 3.5-second pass), and model versioning needs rollback, not just forward migration — `migrate:models` currently only moves stale → current and has no reverse path.
+
+**Operational visibility is `console.log`.**
+No structured logging, no metrics, no tracing, no alerting on queue depth or failure rate. For a system whose whole value is asynchronous background work, "is the worker keeping up?" should be a dashboard, not something inferred by reading a terminal.
+
+**Smaller, but real:**
+- `POST /api/entries` has no idempotency key; a retried create succeeds twice unless it happens to collide on the unique `(companyId, entryNo)` index.
+- `GET /api/entries` has no pagination, only `?limit` capped at 200 — the `KeysetPager` machinery to fix this already exists.
+- `WORKER_LEASE_MS` is a fixed constant rather than tuned against observed pipeline duration; too short causes duplicate work, too long delays crash recovery.
+- No CI, no application containerization (only MongoDB is dockerised), no deployment configuration.
+- Test coverage is deliberately targeted at the paths where being wrong is expensive and non-obvious — claim concurrency, delta routing, migration exactness, similarity correctness — rather than comprehensive. There are no HTTP-layer tests and no frontend tests. For a time-boxed assessment I would make the same trade again; for a maintained system the HTTP contract deserves its own suite, because that is the surface consumers actually bind to.
+
+**Affects:** nothing in the current codebase — this entry is scope documentation, and exists so that "we did not do X" reads as a decision with a reason rather than as something nobody thought about.

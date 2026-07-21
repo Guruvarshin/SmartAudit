@@ -24,23 +24,43 @@ Built to the SmartAudit assessment specification. Every architectural decision, 
 
 ## Quick start
 
-Four terminals from a clean clone. Prerequisites: **Node.js ≥ 20** and **Docker** (or any reachable MongoDB — see below).
+### Before you start
+
+Everything you need to install or have running, in full — there are no hidden steps and **no credentials, API keys or cloud accounts are required anywhere** in this project.
+
+| | Requirement | Check it |
+|---|---|---|
+| 1 | **Node.js ≥ 20** — [nodejs.org](https://nodejs.org) | `node -v` |
+| 2 | **Docker** — [Docker Desktop](https://www.docker.com/products/docker-desktop/), or any reachable MongoDB (see the note at the end of this section) | `docker -v` |
+| 3 | **Docker Desktop actually running.** On Windows and macOS the daemon only runs while Desktop is open; `docker compose up -d` fails with a daemon-connection error otherwise. This is the most common first-run stumble. | `docker ps` returns without error |
+| 4 | **Ports 3000, 4000 and 27017 free** — client, API and MongoDB respectively. All three are configurable; see [Port conflicts](#port-conflicts). | — |
+
+### Run it
+
+Four terminals from a clean clone.
 
 ```bash
-# 0. Install root, server and client dependencies
+git clone <repository-url>
+cd smartaudit
+```
+
+**Terminal 1 — set up and seed:**
+
+```bash
+# 1. Install root, server and client dependencies
 npm run setup
 
-# 1. Configure — the defaults work as-is against the bundled Docker MongoDB
-cp .env.example .env
+# 2. Configure — the defaults work as-is against the bundled Docker MongoDB
+cp .env.example .env          # Windows cmd.exe: copy .env.example .env
 
-# 2. Start MongoDB (single-node replica set; the initiate is idempotent)
+# 3. Start MongoDB (single-node replica set; the initiate is idempotent)
 docker compose up -d
 
-# 3. Hydrate the ledger with 500 deterministic entries
+# 4. Hydrate the ledger with 500 deterministic entries
 npm run seed
 ```
 
-Then, in separate terminals:
+**Terminals 2, 3 and 4** — one each. These are long-lived foreground processes: leave them running.
 
 ```bash
 npm run start:server    # Express API on http://localhost:4000
@@ -50,9 +70,26 @@ npm run start:client    # dashboard on http://localhost:3000
 
 Open <http://localhost:3000>.
 
-> **Port 3000 in use?** The client's port comes from `CLIENT_PORT` in `.env`. Change it there — the Vite dev server and its `/api` proxy both read it.
+> **The worker is not optional.** It is what performs enrichment; without it every entry stays at `enrichment.status: "pending"` forever and the dashboard shows no risk scores. If the ledger looks unscored, check terminal 3 first.
 
-MongoDB Atlas works as a drop-in replacement for step 2: set `MONGODB_URI` and skip `docker compose`. No code path requires transactions or change streams, so a standalone `mongod` is equally fine.
+**When you're done:**
+
+```bash
+docker compose down       # stop MongoDB, keep the data volume
+docker compose down -v    # ...or also delete the data (npm run seed rebuilds it)
+```
+
+### Port conflicts
+
+| Port | Variable | If it's taken |
+|---|---|---|
+| 3000 | `CLIENT_PORT` | Change it in `.env`. The Vite dev server and its `/api` proxy both read it, so nothing else needs touching. |
+| 4000 | `PORT` | Change it in `.env` — **and change `VITE_API_BASE_URL` to match**, since that is the proxy target the client forwards `/api` to. The two must move together. |
+| 27017 | (in `docker-compose.yml` and `MONGODB_URI`) | A local `mongod` service or another Mongo container will block `docker compose up -d`. Stop it, or remap the port in `docker-compose.yml` and update `MONGODB_URI` to match. |
+
+### Using MongoDB Atlas or a local mongod instead
+
+Set `MONGODB_URI` and skip `docker compose` entirely. No code path requires transactions or change streams, so a plain standalone `mongod` works just as well as the bundled replica set.
 
 ---
 
@@ -160,6 +197,19 @@ Accepts only `amount`, `description`, `glNumber`, `postingDate` (→ **B**), `de
 ```
 
 Classification is **diff-based**: re-sending a stored value changes nothing and routes to `no_op`. **409** means a concurrent content write landed between this request's read and its write (see the CAS below).
+
+The Scenario E body shape, in full — `workflowStatus` is a closed enum and `comment` needs both fields:
+
+```jsonc
+{
+  "auditMeta": {
+    "workflowStatus": "in_review",              // unreviewed | in_review | cleared | escalated
+    "comment": { "author": "j.rivera", "text": "Balance corrected." }
+  }
+}
+```
+
+Both keys are optional, but at least one must be present. Comments are **append-only** — the server stamps `at` and pushes; there is no edit or delete surface.
 
 ### `POST /api/entries/search/similar`
 
