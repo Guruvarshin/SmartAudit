@@ -1,3 +1,5 @@
+import '../config/env.js';
+
 /**
  * Shared domain vocabulary.
  *
@@ -5,7 +7,25 @@
  * they are the enumerated vocabulary the schemas, worker and scripts all
  * validate against. The strict-OO requirement applies to anything carrying
  * logic; declarative data like this is not wrapped in a ceremonial class.
+ *
+ * Model versions and risk thresholds read from the environment so the two
+ * admin scenarios can be exercised without editing source: bump a version and
+ * run migrate:models, or shift a threshold and run reevaluate:risk.
  */
+const num = (key, fallback) => {
+  const raw = process.env[key];
+  if (raw === undefined || String(raw).trim() === '') return fallback;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) {
+    throw new Error(`Environment variable ${key} must be a number, got "${raw}".`);
+  }
+  return parsed;
+};
+
+const str = (key, fallback) => {
+  const raw = process.env[key];
+  return raw === undefined || String(raw).trim() === '' ? fallback : String(raw).trim();
+};
 
 export const RiskTier = Object.freeze({
   LOW: 'low',
@@ -19,8 +39,8 @@ export const RiskTier = Object.freeze({
  * them.
  */
 export const RiskThresholds = Object.freeze({
-  MEDIUM: 0.4,
-  HIGH: 0.7
+  MEDIUM: num('RISK_THRESHOLD_MEDIUM', 0.4),
+  HIGH: num('RISK_THRESHOLD_HIGH', 0.7)
 });
 
 export const AnomalyType = Object.freeze({
@@ -105,13 +125,13 @@ export const VECTOR_DIMS = 64;
  * detection. The seed imports this constant so planted data and detection
  * cannot drift apart.
  */
-export const APPROVAL_THRESHOLD = 100000;
+export const APPROVAL_THRESHOLD = num('APPROVAL_THRESHOLD', 100000);
 
 export const ModelVersion = Object.freeze({
-  RISK: 'risk-v1',
-  ANOMALY: 'anomaly-v1',
-  VECTOR: 'vec-v1',
-  COMPLIANCE_RULESET: 'ifrs-ruleset-v1'
+  RISK: str('RISK_MODEL_VERSION', 'risk-v1'),
+  ANOMALY: str('ANOMALY_MODEL_VERSION', 'anomaly-v1'),
+  VECTOR: str('VECTOR_MODEL_VERSION', 'vec-v1'),
+  COMPLIANCE_RULESET: str('COMPLIANCE_RULESET_VERSION', 'ifrs-ruleset-v1')
 });
 
 /**

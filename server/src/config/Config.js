@@ -1,13 +1,9 @@
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import dotenv from 'dotenv';
-
-const HERE = path.dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = path.resolve(HERE, '..', '..', '..');
+import { REPO_ROOT } from './env.js';
 
 /**
- * Reads the repo-root .env once and fails loudly on a missing required value
- * rather than letting `undefined` reach a connection string.
+ * Typed access to the environment, failing loudly on a missing required value
+ * rather than letting `undefined` reach a connection string. The .env file
+ * itself is loaded by ./env.js.
  */
 export class Config {
   /** @type {Config | null} */
@@ -30,13 +26,8 @@ export class Config {
     Object.freeze(this);
   }
 
-  /**
-   * Loads .env from the repo root — the server runs from server/ and the
-   * scripts from anywhere, so the path cannot be relative to cwd.
-   */
   static load() {
     if (!Config.#instance) {
-      dotenv.config({ path: path.join(REPO_ROOT, '.env'), quiet: true });
       Config.#instance = new Config();
     }
     return Config.#instance;
