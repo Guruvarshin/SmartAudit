@@ -2,8 +2,10 @@ import express from 'express';
 import { EntryController } from '../controllers/EntryController.js';
 import { HttpError } from '../http/HttpError.js';
 import { EntryRepository } from '../repositories/EntryRepository.js';
+import { EntryVectorsRepository } from '../repositories/EntryVectorsRepository.js';
 import { EntryRouter } from '../routers/EntryRouter.js';
 import { EntryService } from '../services/EntryService.js';
+import { SimilaritySearchService } from '../services/SimilaritySearchService.js';
 import { UpdatePlanner } from '../services/UpdatePlanner.js';
 
 /**
@@ -17,9 +19,14 @@ export class App {
     this.express = express();
 
     const entryRepository = new EntryRepository();
+    const entryVectorsRepository = new EntryVectorsRepository();
     const updatePlanner = new UpdatePlanner();
     const entryService = new EntryService({ entryRepository, updatePlanner });
-    const entryController = new EntryController({ entryService });
+    const similaritySearchService = new SimilaritySearchService({
+      entryRepository,
+      entryVectorsRepository
+    });
+    const entryController = new EntryController({ entryService, similaritySearchService });
     this.entryRouter = new EntryRouter({ entryController });
 
     this.#mount();

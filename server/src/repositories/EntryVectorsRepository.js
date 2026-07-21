@@ -37,6 +37,21 @@ export class EntryVectorsRepository {
     return EntryVectors.findById(entryId).lean();
   }
 
+  /**
+   * Streaming cursor over one tenant's vectors, projected down to a SINGLE
+   * space (plus its norm and the model version) — a similarity scan reads a
+   * third of each document, and memory stays bounded by the cursor batch no
+   * matter how large the collection grows.
+   */
+  streamCompanySpace(companyId, space) {
+    return EntryVectors.find(
+      { companyId },
+      { [space]: 1, [`norms.${space}`]: 1, modelVersion: 1 }
+    )
+      .lean()
+      .cursor({ batchSize: 200 });
+  }
+
   async count() {
     return EntryVectors.countDocuments();
   }

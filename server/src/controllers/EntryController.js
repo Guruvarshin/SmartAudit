@@ -3,8 +3,18 @@
  * service, choose a status code. No business rules live here.
  */
 export class EntryController {
-  constructor({ entryService }) {
+  constructor({ entryService, similaritySearchService }) {
     this.entryService = entryService;
+    this.similaritySearchService = similaritySearchService;
+  }
+
+  /**
+   * POST /api/entries/search/similar — SPEC.md §3.3.
+   * Body: { entryId, strategy } with strategy ∈ semantic | financial | entity.
+   * 200 with the top-5 closest tenant entries in the chosen space.
+   */
+  async searchSimilar(req, res) {
+    res.json(await this.similaritySearchService.search(req.body));
   }
 
   /**

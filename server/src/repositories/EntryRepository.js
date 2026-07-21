@@ -27,6 +27,12 @@ export class EntryRepository {
     return Entry.findById(id).lean();
   }
 
+  /** Batch fetch for hydrating similarity-search results. */
+  async findByIds(ids) {
+    if (ids.length === 0) return [];
+    return Entry.find({ _id: { $in: ids } }).lean();
+  }
+
   async list({ limit = 50, tier = null, status = null } = {}) {
     const filter = {};
     if (tier) filter['analytics.risk.tier'] = tier;

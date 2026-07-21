@@ -23,6 +23,9 @@ export class EntryRouter {
   #mount() {
     this.router.post('/', this.#handle(this.controller.create));
     this.router.get('/', this.#handle(this.controller.list));
+    // Mounted before the parameterised routes so 'search' can never be
+    // captured as an :id.
+    this.router.post('/search/similar', this.#handle(this.controller.searchSimilar));
     this.router.get('/:id', this.#handle(this.controller.getById));
     this.router.put('/:id', this.#handle(this.controller.update));
   }
