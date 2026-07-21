@@ -24,6 +24,9 @@ export class Config {
     this.migrationBatchSize = this.#int(env, 'MIGRATION_BATCH_SIZE', 100);
     this.seedCount = this.#int(env, 'SEED_COUNT', 500);
     this.seedRandomSeed = this.#int(env, 'SEED_RANDOM_SEED', 20260720);
+    // Deployment accommodation: single-instance hosting gives one process, so
+    // the server can host the worker. Locally they stay separate processes.
+    this.runWorkerInProcess = this.#bool(env, 'RUN_WORKER_IN_PROCESS', false);
     Object.freeze(this);
   }
 
@@ -52,6 +55,12 @@ export class Config {
       );
     }
     return String(value).trim();
+  }
+
+  #bool(env, key, fallback) {
+    const raw = env[key];
+    if (raw === undefined || String(raw).trim() === '') return fallback;
+    return ['1', 'true', 'yes', 'on'].includes(String(raw).trim().toLowerCase());
   }
 
   #int(env, key, fallback) {

@@ -18,6 +18,7 @@ Built to the SmartAudit assessment specification. The [architecture decisions](#
 - [Architecture decisions](#architecture-decisions)
 - [The five scenarios, and where each lives](#the-five-scenarios-and-where-each-lives)
 - [Verification](#verification)
+- [Deployment](#deployment)
 - [Known trade-offs](#known-trade-offs)
 
 ---
@@ -330,6 +331,34 @@ Every component in `client/src` is a `React.Component` class — no hooks, no fu
 - **Two-tab concurrent edit.** Two browser tabs holding the same entry open: one saved a `glNumber` change, then the other — whose snapshot was two writes stale — saved a `description` change. The second save was accepted with the correct `B` routing, and the form re-synchronised to the server's merged state, since the two edits touched disjoint fields and each PUT re-plans from a fresh read.
 
 ---
+
+## Deployment
+
+The app deploys as a **single web service**: Express serves the API and the built client from one origin (so no CORS is involved), with MongoDB Atlas behind it.
+
+```bash
+npm run setup && npm run build    # build command
+npm run start:server              # start command
+```
+
+Required environment variables in the host's dashboard:
+
+| Variable | Value |
+|---|---|
+| `MONGODB_URI` | Your Atlas SRV connection string |
+| `RUN_WORKER_IN_PROCESS` | `true` |
+| `NODE_VERSION` | `20` (or higher) |
+
+`PORT` is supplied by the host and read automatically.
+
+**On `RUN_WORKER_IN_PROCESS`:** free single-instance hosting gives you one process, so this flag lets the web service also run the enrichment worker. It is a deployment accommodation, not a change of architecture — the worker is the same `EnrichmentWorker` class built by the same `WorkerFactory`, and `npm run start:worker` still runs it as an independent process (which is how it runs locally, and how it would run in production on a platform with a worker tier). Because claiming is an atomic `findOneAndUpdate`, adding more worker processes later needs no code change.
+
+Seed the deployed database once from your machine, pointing at Atlas:
+
+```bash
+MONGODB_URI="<atlas-uri>" npm run seed
+# PowerShell: $env:MONGODB_URI="<atlas-uri>"; npm run seed
+```
 
 ## Known trade-offs
 

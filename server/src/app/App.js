@@ -1,4 +1,7 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import express from 'express';
+import { Config } from '../config/Config.js';
 import { EntryController } from '../controllers/EntryController.js';
 import { HttpError } from '../http/HttpError.js';
 import { EntryRepository } from '../repositories/EntryRepository.js';
@@ -44,6 +47,7 @@ export class App {
 
     this.express.get('/health', (req, res) => res.json({ ok: true }));
     this.express.use('/api/entries', this.entryRouter.router);
+    this.#mountClient();
 
     this.express.use(this.#notFound());
     this.express.use(this.#errorHandler());
@@ -56,6 +60,24 @@ export class App {
         resolve(server);
       });
     });
+  }
+
+  /**
+   * Serves the built client when `client/dist` exists, so a deployed instance
+   * is a single origin and needs no CORS. Locally the Vite dev server does
+   * this instead, and the directory is usually absent, so this is a no-op.
+   */
+  #mountClient() {
+    const dist = path.join(Config.repoRoot, 'client', 'dist');
+    if (!fs.existsSync(path.join(dist, 'index.html'))) return;
+
+    this.express.use(express.static(dist));
+    this.express.use((req, res, next) => {
+      // Anything not an API call and not a real file is the single-page app.
+      if (req.method !== 'GET' || req.path.startsWith('/api/')) return next();
+      res.sendFile(path.join(dist, 'index.html'));
+    });
+    this.logger.log(`[server] serving client from ${dist}`);
   }
 
   #requestLog() {

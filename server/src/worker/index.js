@@ -1,11 +1,7 @@
 import { Config } from '../config/Config.js';
 import { MongoConnection } from '../db/MongoConnection.js';
-import { EnrichmentService } from '../enrichment/EnrichmentService.js';
-import { PartialEvaluationService } from '../enrichment/PartialEvaluationService.js';
-import { EntryRepository } from '../repositories/EntryRepository.js';
-import { EntryVectorsRepository } from '../repositories/EntryVectorsRepository.js';
 import { CliArguments } from '../util/CliArguments.js';
-import { EnrichmentWorker } from './EnrichmentWorker.js';
+import { WorkerFactory } from './WorkerFactory.js';
 
 /**
  * Entry point for `npm run start:worker`. Accepts --name (to label logs when
@@ -25,30 +21,9 @@ class WorkerCommand {
   async execute() {
     await this.connection.connect();
 
-    const entryRepository = new EntryRepository();
-    const entryVectorsRepository = new EntryVectorsRepository();
-    // Shared: partial jobs run this directly and the full pipeline composes
-    // it, so there is one scoring implementation rather than two that drift.
-    const partialEvaluationService = new PartialEvaluationService({
-      entryRepository,
-      delayMs: this.config.enrichmentDelayMs
-    });
-    const enrichmentService = new EnrichmentService({
-      entryRepository,
-      entryVectorsRepository,
-      partialEvaluationService,
-      delayMs: this.config.enrichmentDelayMs
-    });
-
-    this.worker = new EnrichmentWorker({
-      entryRepository,
-      enrichmentService,
-      partialEvaluationService,
-      pollIntervalMs: this.config.workerPollIntervalMs,
-      leaseMs: this.config.workerLeaseMs,
-      concurrency: this.args.int('concurrency', this.config.workerConcurrency),
-      maxAttempts: this.config.workerMaxAttempts,
-      name: this.args.string('name', `pid${process.pid}`)
+    this.worker = WorkerFactory.create(this.config, {
+      name: this.args.string('name', `pid${process.pid}`),
+      concurrency: this.args.int('concurrency', this.config.workerConcurrency)
     });
 
     this.worker.start();
