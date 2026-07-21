@@ -97,7 +97,7 @@ Transactions are nonetheless *available, not depended upon*. Enrichment will wri
 
 **Why this one:** ESM is the natural fit for a codebase built on ES6 classes and native `import`, and Jest with ESM requires experimental VM flags or a Babel transform. Node's built-in runner removes that whole toolchain for what will be a small, targeted test suite. Fewer moving parts on a reviewer's machine is worth more here than Jest's richer matchers.
 
-**Note on `CLAUDE.md` constraint #1:** logic lives in classes (`Config`, `MongoConnection`, `EntryFactory`, `SeedRunner`, `SeededRandom`, `CliArguments`, and the Day 2+ controllers/services/repositories/workers). Mongoose **schema definitions** and the frozen vocabulary in `domain/Constants.js` are declarative data, not the "loose, procedural functional modules" the constraint forbids, so they are not wrapped in ceremonial classes. Flagged to the user at plan approval.
+**Note on `CLAUDE.md` constraint #1:** logic lives in classes (`Config`, `MongoConnection`, `EntryFactory`, `SeedRunner`, `SeededRandom`, `CliArguments`, and the Day 2+ controllers/services/repositories/workers). Mongoose **schema definitions**, the frozen vocabulary in `domain/Constants.js`, and the frozen reference data in `seed/LedgerReferenceData.js` are declarative data, not the "loose, procedural functional modules" the constraint forbids, so they are not wrapped in ceremonial classes. Flagged to the user at plan approval. *(Amended Day 2: the independent verification pass noted `LedgerReferenceData.js` was not literally named here despite being the same declarative character — now it is.)*
 
 **Affects:** `package.json`, `server/package.json`, every source file.
 
