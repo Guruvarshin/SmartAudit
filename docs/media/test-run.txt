@@ -1,0 +1,61 @@
+﻿
+
+
+
+▶ enrichment job claiming
+  ✔ concurrent claims are pairwise disjoint and each job is claimed exactly once (144.3516ms)
+  ✔ a processing job inside its lease is not claimable (27.7185ms)
+  ✔ a processing job whose lease expired is reclaimed, incrementing attempts (33.629ms)
+  ✔ a zombie claimant cannot complete, release, or fail a job it lost (26.6057ms)
+✔ enrichment job claiming (366.8006ms)
+▶ PUT delta routing
+  ▶ classification (UpdatePlanner)
+    ✔ routes a core financial field change to Scenario B (108.2473ms)
+    ✔ routes a balance-side change to Scenario D (38.4965ms)
+    ✔ routes a metadata-only edit to Scenario E with no enqueue (24.7901ms)
+    ✔ a mixed update takes the strongest scenario (B) while keeping the metadata writes (16.131ms)
+    ✔ is diff-based: re-sending stored values is a no-op (20.3664ms)
+    ✔ rejects fields outside the closed taxonomy with 400 (21.4752ms)
+    ✔ a D-route enqueue never downgrades a pending full recompute (27.1293ms)
+  ✔ classification (UpdatePlanner) (257.5707ms)
+  ▶ Scenario B — core field change
+    ✔ applies the edit and re-enqueues a full recompute in one write (21.8214ms)
+    ✔ supersedes an in-flight claim: the old run is fenced out (33.5161ms)
+  ✔ Scenario B — core field change (55.5671ms)
+  ▶ Scenario D — balance change, vectors untouched
+    ✔ queues a partial re-evaluation and the vector document never moves (41.8936ms)
+  ✔ Scenario D — balance change, vectors untouched (42.0036ms)
+  ▶ Scenario E — metadata only
+    ✔ saves synchronously and never touches queue state or vectors (22.2433ms)
+    ✔ rejects an invalid workflow status with 400 (20.4716ms)
+  ✔ Scenario E — metadata only (42.9828ms)
+  ▶ concurrency and idempotence
+    ✔ a double-clicked save is a no-op the second time (22.0822ms)
+    ✔ the CAS filter misses when `updated` has moved on (18.9095ms)
+    ✔ the service surfaces 409 when every CAS attempt loses (18.6288ms)
+  ✔ concurrency and idempotence (59.8157ms)
+✔ PUT delta routing (592.4997ms)
+▶ Scenario C migration and Scenario D bulk re-evaluation
+  ✔ migrates every stale entry across multiple keyset pages, exactly once (289.7841ms)
+  ✔ re-running the migration is a no-op (the version stamp is the checkpoint) (62.9294ms)
+  ✔ guarded writes never clobber a concurrent worker restamp (28.4049ms)
+  ✔ dry run reports stale counts without writing anything (20.9495ms)
+  ✔ bulk re-evaluation re-scores analytics while the vector collection is frozen (101.4034ms)
+✔ Scenario C migration and Scenario D bulk re-evaluation (633.2229ms)
+▶ similarity search
+  ✔ semantic strategy surfaces the planted near-duplicate cluster (212.6595ms)
+  ✔ entity strategy also groups the cluster (same vendor, GL, poster) (101.928ms)
+  ✔ results are capped at 5, descending, self-excluded, and hydrated (200.3411ms)
+  ✔ search is tenant-scoped: another company's twin entry is never returned (116.7822ms)
+  ✔ flags candidates left at a superseded vector version as stale (101.577ms)
+  ✔ rejects an unknown strategy with 400 and an unknown entry with 404 (96.2222ms)
+  ✔ returns 409 for an entry that has not been enriched yet (104.7102ms)
+✔ similarity search (1066.1353ms)
+ℹ tests 31
+ℹ suites 9
+ℹ pass 31
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4611.7523

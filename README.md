@@ -176,21 +176,45 @@ The dashboard's diagnostics modal badges pre-migration vectors as **stale model*
 
 ## Demo media
 
-Captured against the running stack (`docs/media/`).
+Captured against the running stack. Terminal images are syntax-highlighted renderings of real captured output — the verbatim source for the worker log and the test run ships alongside them as `.txt`, so the images can be checked against the text.
 
-**1 · Dashboard** — risk-tier colour coding, per-entry anomaly counts, compliance and enrichment badges, and a freshly-created entry still `pending` while the worker is mid-flight. The header shows the adaptive poll ("worker active — polling every 2s").
+### The application
+
+**Dashboard** — risk-tier colour coding, per-entry anomaly counts, compliance and enrichment badges, and a live poll indicator. `JE-WALK-01` sits at risk 1.00 / high; `JE-103069` carries the `escalated` workflow badge written by a Scenario E edit.
 
 ![SmartAudit dashboard](docs/media/dashboard.png)
 
-**2 · Multi-vector diagnostics modal** — itemised risk factors with weights and contributions, IFRS compliance flags, granular anomaly signals naming both type *and* field, all three 64-dimension vector spaces with their L2 norms, and a live entity-strategy similarity search. The edit surface tags each field with the scenario it routes to (**B** = full recompute, **D** = risk-only).
+**Multi-vector diagnostics modal** — itemised risk factors with weights and contributions, four IFRS compliance flags, granular anomaly signals naming both type *and* field, all three 64-dimension vector spaces with their L2 norms, and a live entity-strategy similarity search that surfaces the duplicate `JE-WALK-02` at similarity `1.0000`. The edit surface tags each field with the scenario it routes to.
 
 ![Diagnostics modal](docs/media/diagnostics-modal.png)
 
-**3 · Worker terminal during a recomputation loop** — one worker process handling, in order: a Scenario A create (`reason=create, pipeline=full`), a Scenario B core-field edit (`reason=core_field_change, pipeline=full`), and a Scenario D balance edit (`reason=context_shift, pipeline=partial`). A Scenario E metadata edit was issued between them and produces **no line at all** — it bypasses the queue entirely.
+### The pipeline
+
+**Worker during recomputation** — one worker handling a Scenario A create (`reason=create, pipeline=full`), a Scenario B core-field edit (`reason=core_field_change, pipeline=full`), and a Scenario D balance edit (`reason=context_shift, pipeline=partial`). Scenario E edits were issued between them and produce **no line at all**: they bypass the queue entirely. Raw log: [`worker-recompute.txt`](docs/media/worker-recompute.txt).
 
 ![Worker terminal log](docs/media/worker-terminal.png)
 
-> The log image is a syntax-highlighted rendering of captured worker output, not a photo of a terminal window. The verbatim source is committed alongside it at [`docs/media/worker-recompute.txt`](docs/media/worker-recompute.txt) — the text in the image matches that file exactly.
+**All five scenarios through the API** — each `PUT` returns the routing block that names the detected scenario, and a field outside the closed taxonomy is refused with a 400 listing what *is* updatable.
+
+![Scenarios A-E via the API](docs/media/api-scenarios.png)
+
+**Server** — one process serving the API and the built client from a single origin.
+
+![Server startup](docs/media/server-startup.png)
+
+### Admin scripts and tests
+
+**Migration and bulk re-evaluation** — a dry run, a real keyset-paginated migration across five batches, a no-op re-run proving the version stamp is the checkpoint, and a bulk risk re-evaluation reporting `vectors untouched`.
+
+![Admin scripts](docs/media/admin-scripts.png)
+
+**Seeding** — 500 deterministic entries with a planted-cohort report, so detection output can be compared against a known answer.
+
+![Seed run](docs/media/seed-run.png)
+
+**Test suite** — 31 tests, 0 failures. Raw output: [`test-run.txt`](docs/media/test-run.txt).
+
+![Test run](docs/media/test-run.png)
 
 ---
 
