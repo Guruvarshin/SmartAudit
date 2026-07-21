@@ -24,6 +24,7 @@ export class EntryRouter {
     this.router.post('/', this.#handle(this.controller.create));
     this.router.get('/', this.#handle(this.controller.list));
     this.router.get('/:id', this.#handle(this.controller.getById));
+    this.router.put('/:id', this.#handle(this.controller.update));
   }
 
   #handle(method) {

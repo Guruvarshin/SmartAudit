@@ -1,6 +1,7 @@
 import { Config } from '../config/Config.js';
 import { MongoConnection } from '../db/MongoConnection.js';
 import { EnrichmentService } from '../enrichment/EnrichmentService.js';
+import { PartialEvaluationService } from '../enrichment/PartialEvaluationService.js';
 import { EntryRepository } from '../repositories/EntryRepository.js';
 import { EntryVectorsRepository } from '../repositories/EntryVectorsRepository.js';
 import { CliArguments } from '../util/CliArguments.js';
@@ -30,15 +31,25 @@ class WorkerCommand {
 
     const entryRepository = new EntryRepository();
     const entryVectorsRepository = new EntryVectorsRepository();
+    // One shared partial service: context_shift jobs run it directly (it holds
+    // no vectors handle — the Scenario D guarantee), and the full pipeline
+    // composes it, so both share one baseline cache and one scoring
+    // implementation.
+    const partialEvaluationService = new PartialEvaluationService({
+      entryRepository,
+      delayMs: this.config.enrichmentDelayMs
+    });
     const enrichmentService = new EnrichmentService({
       entryRepository,
       entryVectorsRepository,
+      partialEvaluationService,
       delayMs: this.config.enrichmentDelayMs
     });
 
     this.worker = new EnrichmentWorker({
       entryRepository,
       enrichmentService,
+      partialEvaluationService,
       pollIntervalMs: this.config.workerPollIntervalMs,
       leaseMs: this.config.workerLeaseMs,
       concurrency: this.args.int('concurrency', this.config.workerConcurrency),

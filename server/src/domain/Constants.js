@@ -58,6 +58,19 @@ export const EnrichmentReason = Object.freeze({
   MODEL_MIGRATION: 'model_migration'
 });
 
+/**
+ * Reasons whose jobs run the FULL pipeline (vectors + risk). `context_shift`
+ * is deliberately absent: a Scenario D job runs the partial pipeline, which
+ * holds no handle to the vectors collection at all. The delta router must
+ * never let a partial enqueue overwrite one of these (a downgrade would drop
+ * a recompute the entry is still owed).
+ */
+export const FULL_RECOMPUTE_REASONS = Object.freeze([
+  EnrichmentReason.CREATE,
+  EnrichmentReason.CORE_FIELD_CHANGE,
+  EnrichmentReason.MODEL_MIGRATION
+]);
+
 /** Compliance evaluation outcome. */
 export const ComplianceStatus = Object.freeze({
   PASS: 'pass',
@@ -143,6 +156,28 @@ export const CORE_FINANCIAL_FIELDS = Object.freeze([
   'glNumber',
   'postingDate'
 ]);
+
+/**
+ * Balance sides. Deliberately NOT core financial fields: SPEC.md Scenario B
+ * enumerates its invalidation set exhaustively ("amount, description,
+ * glNumber, or postingDate") and leaves debit/credit outside it. Editing a
+ * side changes the balance_mismatch signal — so risk and compliance must be
+ * re-evaluated — but per the spec's own list it does not invalidate the
+ * vectors. That is Scenario D's shape, and the delta router treats it so.
+ */
+export const BALANCE_FIELDS = Object.freeze(['debit', 'credit']);
+
+/**
+ * PUT delta-routing outcomes, labelled by the spec scenario they implement.
+ * Returned in the PUT response so the routing decision is observable, not
+ * inferred from side effects.
+ */
+export const UpdateScenario = Object.freeze({
+  CORE_FIELD_CHANGE: 'B',
+  RISK_CONTEXT_CHANGE: 'D',
+  METADATA_ONLY: 'E',
+  NO_OP: 'no_op'
+});
 
 /** Collection names, centralised so scripts and models cannot drift apart. */
 export const Collections = Object.freeze({

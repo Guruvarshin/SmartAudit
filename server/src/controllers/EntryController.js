@@ -20,6 +20,18 @@ export class EntryController {
     res.status(201).json(entry);
   }
 
+  /**
+   * PUT /api/entries/:id — Scenarios B / D / E, routed by the UpdatePlanner.
+   *
+   * 200 with { routing, entry }: the routing block names the detected
+   * scenario ('B' | 'D' | 'E' | 'no_op') and the action taken, so the
+   * classification is part of the API contract rather than something to
+   * infer from worker logs.
+   */
+  async update(req, res) {
+    res.json(await this.entryService.update(req.params.id, req.body));
+  }
+
   /** GET /api/entries/:id */
   async getById(req, res) {
     res.json(await this.entryService.getById(req.params.id));

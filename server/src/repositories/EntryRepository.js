@@ -34,6 +34,53 @@ export class EntryRepository {
     return Entry.find(filter).sort({ postingDate: -1 }).limit(limit).lean();
   }
 
+  /**
+   * Executes an UpdatePlanner plan as ONE targeted updateOne — baseline
+   * $sets, auditMeta $set/$push, and (for Scenarios B/D) the re-enqueue flip,
+   * all in the same atomic write. There is no window where the new field
+   * values exist but the recompute isn't queued.
+   *
+   * Concurrency, layered:
+   *  - the filter on `updated` is optimistic concurrency (CAS): it races only
+   *    against genuine content writes, because queue bookkeeping deliberately
+   *    never bumps `updated` (Day 2). A miss returns false and the service
+   *    re-plans from a fresh read.
+   *  - the re-enqueue $set drops status back to `pending` even if a worker is
+   *    mid-run on the OLD values. That deliberately breaks the running claim's
+   *    fence (status no longer `processing`), so the stale result is discarded
+   *    and the job is re-claimed with the new content — Day 2's fence working
+   *    in a new direction, not a new mechanism.
+   *  - `attempts` resets to 0: a re-enqueue is a fresh job generation with a
+   *    fresh retry budget (otherwise historical failures permanently erode
+   *    WORKER_MAX_ATTEMPTS). A zombie's fence still fails on status +
+   *    claimedAt; colliding would need a reclaim in the same millisecond.
+   *
+   * @returns {Promise<boolean>} false when the CAS filter missed
+   */
+  async applyUpdatePlan(entryId, expectedUpdated, plan) {
+    const $set = { ...plan.baselineSet, ...plan.auditMetaSet };
+    if (plan.enqueue) {
+      $set['analytics.enrichment.status'] = EnrichmentStatus.PENDING;
+      $set['analytics.enrichment.reason'] = plan.enqueue.reason;
+      $set['analytics.enrichment.attempts'] = 0;
+      $set['analytics.enrichment.claimedAt'] = null;
+      $set['analytics.enrichment.completedAt'] = null;
+      $set['analytics.enrichment.lastError'] = null;
+    }
+
+    const update = { $set };
+    if (plan.commentPush) {
+      update.$push = { 'auditMeta.comments': plan.commentPush };
+    }
+
+    const result = await Entry.updateOne(
+      { _id: entryId, updated: expectedUpdated },
+      update,
+      { runValidators: true }
+    );
+    return result.matchedCount === 1;
+  }
+
   // ---------------------------------------------------------------------------
   // Job queue — atomic claim, lease, fenced completion.
   // ---------------------------------------------------------------------------

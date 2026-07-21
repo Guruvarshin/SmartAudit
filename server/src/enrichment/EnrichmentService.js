@@ -1,15 +1,13 @@
 import { setTimeout as sleep } from 'node:timers/promises';
 import { ModelVersion } from '../domain/Constants.js';
-import { AmountBaselineProvider } from './AmountBaselineProvider.js';
-import { AnomalyDetector } from './AnomalyDetector.js';
-import { ComplianceEvaluator } from './ComplianceEvaluator.js';
-import { RiskScorer } from './RiskScorer.js';
+import { PartialEvaluationService } from './PartialEvaluationService.js';
 import { VectorGenerator } from './VectorGenerator.js';
 
 /**
- * Orchestrates the full intelligence pipeline for one journal entry: the
- * simulated model delay, the four engines, and the ordered two-collection
- * write.
+ * Orchestrates the FULL intelligence pipeline for one journal entry: the
+ * simulated model delay, the risk half (delegated to PartialEvaluationService
+ * so scoring has exactly one implementation), the vector half, and the ordered
+ * two-collection write.
  *
  * Write order is the Day 1 commit-point design (no cross-collection
  * transaction, by decision): vectors are upserted first, then a single fenced
@@ -19,16 +17,22 @@ import { VectorGenerator } from './VectorGenerator.js';
  * idempotently. No partial state is ever readable as complete.
  */
 export class EnrichmentService {
-  constructor({ entryRepository, entryVectorsRepository, delayMs, logger = console }) {
+  constructor({
+    entryRepository,
+    entryVectorsRepository,
+    delayMs,
+    partialEvaluationService = null,
+    logger = console
+  }) {
     this.entryRepository = entryRepository;
     this.entryVectorsRepository = entryVectorsRepository;
     this.delayMs = delayMs;
     this.logger = logger;
 
-    this.baselineProvider = new AmountBaselineProvider({ entryRepository });
-    this.anomalyDetector = new AnomalyDetector();
-    this.riskScorer = new RiskScorer();
-    this.complianceEvaluator = new ComplianceEvaluator();
+    // The risk half. Injectable so the worker can share one instance (and its
+    // baseline cache) between full and partial jobs.
+    this.partialEvaluationService =
+      partialEvaluationService ?? new PartialEvaluationService({ entryRepository, delayMs });
     this.vectorGenerator = new VectorGenerator();
   }
 
@@ -79,8 +83,45 @@ export class EnrichmentService {
   }
 
   /**
-   * The computation half, shared by every path: simulated ML delay, then
-   * baseline fetch, anomaly signals, risk score, compliance flags, vectors.
+   * Scenario C: re-enriches one stale entry at the CURRENT model versions,
+   * with both writes guarded so a concurrently running worker (whose result
+   * is computed from fresher content) is never clobbered:
+   *
+   *  - the vector replace lands only while the stored vector doc is still at
+   *    a superseded version;
+   *  - the analytics $set lands only while analytics.risk.modelVersion still
+   *    reads the stale version this migration pass scanned.
+   *
+   * Both writes are idempotent and independently guarded, so a crash between
+   * them re-converges on the next run: the entry still scans as stale, the
+   * already-migrated half's guard simply misses, and the missing half lands.
+   *
+   * @returns {Promise<{ vectorsUpdated: boolean, analyticsUpdated: boolean }>}
+   */
+  async migrateStale(entry, { fromRiskVersion }) {
+    const artifacts = await this.compute(entry, { simulateModelDelay: false });
+
+    const vectorsUpdated = await this.entryVectorsRepository.replaceIfStale(
+      entry._id,
+      entry.companyId,
+      artifacts.vectors,
+      ModelVersion.VECTOR
+    );
+    const analyticsUpdated = await this.entryRepository.applyMigratedAnalytics(
+      entry._id,
+      fromRiskVersion,
+      this.#analyticsPayload(artifacts, {
+        risk: ModelVersion.RISK,
+        anomaly: ModelVersion.ANOMALY,
+        complianceRuleset: ModelVersion.COMPLIANCE_RULESET
+      })
+    );
+    return { vectorsUpdated, analyticsUpdated };
+  }
+
+  /**
+   * The computation half, shared by every path: simulated ML delay, then the
+   * risk half (baseline, anomalies, score, compliance) plus the vectors.
    */
   async compute(entry, { simulateModelDelay }) {
     if (simulateModelDelay) {
@@ -89,13 +130,10 @@ export class EnrichmentService {
       await sleep(this.delayMs);
     }
 
-    const baseline = await this.baselineProvider.baselineFor(entry.companyId, entry.glNumber);
-    const anomalies = this.anomalyDetector.detect(entry, baseline);
-    const risk = this.riskScorer.score(anomalies);
-    const compliance = this.complianceEvaluator.evaluate(anomalies, risk);
+    const partial = await this.partialEvaluationService.compute(entry);
     const vectors = this.vectorGenerator.generate(entry);
 
-    return { anomalies, risk, compliance, vectors };
+    return { ...partial, vectors };
   }
 
   async #persistVectors(entry, artifacts, vectorModelVersion) {
@@ -108,23 +146,6 @@ export class EnrichmentService {
   }
 
   #analyticsPayload(artifacts, versions) {
-    const computedAt = new Date();
-    return {
-      risk: {
-        score: artifacts.risk.score,
-        tier: artifacts.risk.tier,
-        factors: artifacts.risk.factors,
-        modelVersion: versions.risk,
-        computedAt
-      },
-      compliance: {
-        status: artifacts.compliance.status,
-        flags: artifacts.compliance.flags,
-        rulesetVersion: versions.complianceRuleset,
-        evaluatedAt: computedAt
-      },
-      anomalies: artifacts.anomalies,
-      anomalyModelVersion: versions.anomaly
-    };
+    return this.partialEvaluationService.analyticsPayload(artifacts, versions);
   }
 }

@@ -4,6 +4,7 @@ import { HttpError } from '../http/HttpError.js';
 import { EntryRepository } from '../repositories/EntryRepository.js';
 import { EntryRouter } from '../routers/EntryRouter.js';
 import { EntryService } from '../services/EntryService.js';
+import { UpdatePlanner } from '../services/UpdatePlanner.js';
 
 /**
  * Composition root for the HTTP application. Wires repository → service →
@@ -16,7 +17,8 @@ export class App {
     this.express = express();
 
     const entryRepository = new EntryRepository();
-    const entryService = new EntryService({ entryRepository });
+    const updatePlanner = new UpdatePlanner();
+    const entryService = new EntryService({ entryRepository, updatePlanner });
     const entryController = new EntryController({ entryService });
     this.entryRouter = new EntryRouter({ entryController });
 

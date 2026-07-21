@@ -1,4 +1,5 @@
 import { setTimeout as sleep } from 'node:timers/promises';
+import { EnrichmentReason, FULL_RECOMPUTE_REASONS } from '../domain/Constants.js';
 
 /**
  * The background enrichment worker — SPEC.md Scenario A's asynchronous
@@ -17,6 +18,7 @@ export class EnrichmentWorker {
   constructor({
     entryRepository,
     enrichmentService,
+    partialEvaluationService,
     pollIntervalMs,
     leaseMs,
     concurrency,
@@ -26,6 +28,7 @@ export class EnrichmentWorker {
   }) {
     this.entryRepository = entryRepository;
     this.enrichmentService = enrichmentService;
+    this.partialEvaluationService = partialEvaluationService;
     this.pollIntervalMs = pollIntervalMs;
     this.leaseMs = leaseMs;
     this.concurrency = concurrency;
@@ -82,12 +85,20 @@ export class EnrichmentWorker {
     const claim = { claimedAt: enrichment.claimedAt, attempts: enrichment.attempts };
     const startedAt = Date.now();
 
+    // The job's reason selects the pipeline (SPEC.md Scenario D): full-recompute
+    // reasons run vectors + risk; context_shift runs the partial evaluation
+    // service, which holds no handle to the vectors collection at all.
+    const reason = enrichment.reason ?? EnrichmentReason.CREATE;
+    const fullPipeline = FULL_RECOMPUTE_REASONS.includes(reason);
+    const pipeline = fullPipeline ? this.enrichmentService : this.partialEvaluationService;
+
     this.logger.log(
-      `${tag} claimed ${entry._id} (${entry.entryNo}, reason=${enrichment.reason}, attempt=${claim.attempts})`
+      `${tag} claimed ${entry._id} (${entry.entryNo}, reason=${reason}, ` +
+        `pipeline=${fullPipeline ? 'full' : 'partial'}, attempt=${claim.attempts})`
     );
 
     try {
-      const { outcome, artifacts } = await this.enrichmentService.process(entry);
+      const { outcome, artifacts } = await pipeline.process(entry);
       const ms = Date.now() - startedAt;
 
       if (outcome === 'discarded') {
