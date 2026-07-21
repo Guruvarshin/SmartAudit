@@ -153,3 +153,81 @@ Transactions are nonetheless *available, not depended upon*. Enrichment will wri
 - **Body-shaping is whitelist-only** (`EntryService.#pickCreatable`): a client cannot write `analytics`, `auditMeta`, or `_id` through `POST /api/entries` because unknown keys are never copied, not because they are stripped.
 
 **Affects:** `server/src/routers/EntryRouter.js`, `server/src/repositories/EntryRepository.js`, `server/src/seed/SeedRunner.js`, `server/src/services/EntryService.js`.
+
+---
+
+## [Day 3] PUT delta routing: one classifier, a closed field taxonomy, one atomic CAS-guarded write
+
+**Decision:** `UpdatePlanner` is the single place scenario detection lives. It classifies a PUT diff against a **closed** taxonomy defined in `domain/Constants.js` — `CORE_FINANCIAL_FIELDS` → Scenario B (full recompute enqueued, `reason: core_field_change`), `BALANCE_FIELDS` (`debit`/`credit`, new) → Scenario D (partial re-evaluation enqueued, `reason: context_shift`), `auditMeta.workflowStatus`/`comment` → Scenario E (synchronous, queue untouched) — and emits an immutable plan that `EntryRepository.applyUpdatePlan` executes as ONE `updateOne`: field `$set`s, auditMeta ops, and the re-enqueue flip together, filtered on `{ _id, updated: <at read> }` (optimistic CAS; one internal retry, then 409). Classification is diff-based: re-sending stored values is a no-op, which is what makes a double-clicked save free. Any other field — vendor `name`, `entryNo`, `currency`, every `analytics`/`_id` path — is a 400 naming the keys. Mixed updates take the strongest scenario (B ⊃ D; E's writes ride the same atomic update). The PUT response carries a `routing` block (`scenario`, `action`, `changedFields`) so the classification is API-observable, not inferred from logs.
+
+**Alternatives considered:** per-scenario conditionals in the service/controller (scatters the definition of "what a change means" and cannot guarantee a total classification); presence-based rather than diff-based detection (double-clicks would re-trigger recomputes); an open whitelist passing unclassified fields through (hollows out the routing claim); `debit`/`credit` as Scenario B members (leaves the PUT with no detectable D class at all, contradicting `DAY_PLAN.md`'s explicit B/D/E routing deliverable).
+
+**Why debit/credit are the D route (user-confirmed at plan approval):** SPEC.md Scenario B enumerates its invalidation set exhaustively ("amount, description, glNumber, or postingDate"); a balance edit changes the `balance_mismatch` signal — risk and compliance must move — but per the spec's own list does not invalidate vectors. That is exactly Scenario D's premise. *Acknowledged tradeoff, accepted explicitly:* the financial vector's side/imbalance features do read `debit`/`credit`, so after a D update the stored financial vector reflects the pre-edit balance; the spec's exhaustive list, not the feature extractor, defines the invalidation contract. Consistent with Day 2's `sourceHash`, which hashes only the four core fields.
+
+**Concurrency notes (interactions with Day 2, all deliberate):**
+- A B/D re-enqueue sets `status: pending` even mid-run, which breaks the running claim's fence — the stale result is discarded and the job re-claimed with new content. Day 2's fence working in a new direction, no new mechanism. Verified in `deltaRouting.test.js`.
+- The CAS on `updated` races only against content writes because Day 2 decided queue bookkeeping never bumps `updated`.
+- A D enqueue never downgrades a pending full-pipeline `reason` (`FULL_RECOMPUTE_REASONS` guard), decided from the CAS-protected snapshot.
+- **Amendment to Day 2's fencing (user-approved):** re-enqueue resets `attempts: 0` — a fresh job generation deserves a fresh retry budget; otherwise historical failures permanently erode `WORKER_MAX_ATTEMPTS`. Fence safety then rests on `status` + `claimedAt`; a collision would need a reclaim within the same millisecond. Deliberate micro-tradeoff against the pure monotonic-token reading.
+
+**Affects:** `server/src/services/UpdatePlanner.js`, `server/src/services/EntryService.js`, `server/src/repositories/EntryRepository.js` (`applyUpdatePlan`), `server/src/domain/Constants.js`, `server/test/deltaRouting.test.js`.
+
+---
+
+## [Day 3] Scenario D's execution path is structurally vector-free: PartialEvaluationService + reason-driven worker pipelines
+
+**Decision:** the risk half of enrichment (baseline → anomalies → risk → compliance) was extracted into `PartialEvaluationService`, which imports neither the `EntryVectors` model nor its repository. `EnrichmentService` composes it for full runs — one scoring implementation, not two that drift. The worker selects the pipeline from the claimed job's `reason`: `FULL_RECOMPUTE_REASONS` → `EnrichmentService.process` (vectors + risk); `context_shift` → `PartialEvaluationService.process`, which commits through the same fenced `completeEnrichment` (already analytics-only). Partial jobs keep the 400ms simulated delay for a uniform async model in the worker logs. This makes Day 1's "the risk path holds no handle to vectors" literal for every D execution path — per-entry PUT jobs and the bulk script alike.
+
+**Alternatives considered:** running D synchronously in the request (contrast is showy but contradicts Day 1's recorded intent that `EnrichmentReason` "drives which pipelines the worker runs", loses queue coalescing, and blocks the response on a 400ms simulation); a partial *method* on `EnrichmentService` (keeps a vectors handle in scope of the D path — the guarantee would be behavioural again, not structural).
+
+**Verified, not asserted (live, user-required):** PUT `credit` on entry `JE-103069` → routing `D`, worker log `reason=context_shift, pipeline=partial`, risk re-scored 0 → 0.45/medium with `balance_mismatch` — and the `entry_vectors` document byte-identical before/after (`updated: 04:42:28.619Z`, same `sourceHash`). The immediately following PUT `description` → `pipeline=full` moved both (`updated: 04:43:49.612Z`, new hash): the boundary cuts exactly where claimed. Test-level witness: `deltaRouting.test.js` deep-equals the whole vector doc across a D run.
+
+**Affects:** `server/src/enrichment/PartialEvaluationService.js`, `server/src/enrichment/EnrichmentService.js`, `server/src/worker/EnrichmentWorker.js`, `server/src/worker/index.js`.
+
+---
+
+## [Day 3] Similarity search: application-side streaming cosine over precomputed norms, one implementation for all three strategies
+
+**Decision:** `SimilaritySearchService` implements `POST /api/entries/search/similar` as a tenant-scoped streaming scan of `entry_vectors`, projected to a SINGLE space per candidate (~⅓ of each document) plus its precomputed L2 norm and `modelVersion`. Cosine reduces to dot ÷ (two stored scalars); results keep a fixed 5-slot insertion table (spec fixes top-5; a heap is ceremony at k=5), then one `$in` hydration of the winners. The strategy string (validated against `VectorSpace`) only selects which array/norm participates — there are not three code paths. Errors: 400 bad strategy/id, 404 unknown entry, 409 not-yet-enriched; a zero-norm query returns empty (degenerate input, not an error), zero-norm candidates are skipped. Each result carries `stale: modelVersion !== current`, so pre-migration candidates are visibly stale rather than silently comparable.
+
+**Alternatives considered:** aggregation-pipeline dot products via `$zip`/`$reduce` (no incremental top-k, unreadable, no offsetting win at this scale); Atlas `$vectorSearch` (violates Day 1's local-Docker parity). `entry_vectors` remains the documented seam where a real vector store would replace the scan wholesale.
+
+**Verified:** planted near-duplicate clusters retrieved as the top block in semantic and entity spaces (`similarity.test.js`, similarity > 0.9 for cosmetic variants); tenant isolation holds for a byte-identical foreign-company twin; live endpoint returned 5 ordered results per strategy against the 500-entry seed.
+
+**Affects:** `server/src/services/SimilaritySearchService.js`, `server/src/repositories/EntryVectorsRepository.js` (`streamCompanySpace`), `server/src/repositories/EntryRepository.js` (`findByIds`), `server/src/routers/EntryRouter.js`, `server/test/similarity.test.js`.
+
+---
+
+## [Day 3] Scenario C migration: keyset pages per stale version, guarded idempotent writes, the version stamp as checkpoint
+
+**Decision:** `npm run migrate:models` (`ModelMigrationService`) collects `distinct` risk model versions, and for each stale version pages with `{ modelVersion: v, status: complete, _id > last }` sorted `_id` ascending — equality + range riding Day 1's `risk_model_version_scan` compound index with zero skipped-and-scanned rows, exactly the shape that index was built for. Per entry it recomputes via the existing `EnrichmentService.compute` (no delay — the 400ms simulation belongs to the async worker, per the `--enrich-historical` precedent) and lands two **guarded** writes: vectors `replaceOne` filtered `modelVersion: { $ne: current }`, then analytics `$set` filtered on the stale version still being in place. A concurrent worker restamp therefore can never be clobbered (its content is at least as fresh), a crash between the writes re-converges on rerun, and rerunning the whole migration is a no-op — the stamp itself is the checkpoint, no state file. Batch size defaults to `MIGRATION_BATCH_SIZE` (100, `--batch-size` override): bounds memory to one page of lean docs, amortises round-trips, and logs progress at a readable cadence. `--dry-run` reports per-version counts. Only `status: complete` entries migrate — in-flight ones get current stamps from whichever worker completes them.
+
+**Alternatives considered:** one long-lived `find().cursor()` stream (also literally "cursor pagination", but can time out mid-migration and is not resumable; stateless keyset batches are the stronger answer to "without exhausting database memory limits"); `.skip()` (spec-prohibited, and O(n²) scan work); driving the migration through the queue with `reason: model_migration` (500 status flips would churn the claimable index and demote settled entries to `pending` for no benefit — the reason value remains available for future use).
+
+**Timestamp refinement of Day 2 (flagged, not silently overridden):** migration writes use `timestamps: false` — a model upgrade is analytics churn, not a ledger content change, and months-old entries must not surface as freshly edited. Day 2's "completion bumps `updated`" stands for enrichment that follows a genuine content change; `analytics.risk.computedAt` is the migration witness. Asserted in `migration.test.js`.
+
+**Verified:** live run migrated the full 500-entry `--enrich-historical` fixture `risk-v0 → risk-v1` in five batches of 100 (4.0s); tests cover multi-page exactness (batch 2 over 7 docs, each migrated exactly once), rerun no-op, dry-run, and the no-clobber guards under a simulated concurrent restamp.
+
+**Affects:** `server/src/scripts/migrateModels.js`, `server/src/scripts/ModelMigrationService.js`, `server/src/util/KeysetPager.js`, `server/src/repositories/EntryRepository.js` (page/count/guarded-write methods), `server/src/repositories/EntryVectorsRepository.js` (`replaceIfStale`), `server/test/migration.test.js`.
+
+---
+
+## [Day 3] Scenario D's bulk script: reevaluate:risk, added to Day 3 scope
+
+**Decision:** `npm run reevaluate:risk` (`RiskReEvaluationService`) is the "partial evaluation script" SPEC.md Scenario D literally requires: after shifting `RiskThresholds` / `APPROVAL_THRESHOLD` (centralised in `Constants.js` on Day 2 for exactly this), it keyset-pages all settled entries, re-derives anomalies + risk + compliance via `PartialEvaluationService`, and applies a targeted `$set` on `analytics.*` guarded on `status: complete` (an in-flight recompute owns its entry and will apply current thresholds itself). Anomalies are recomputed too, not just the scalars — the score is a function of the signals and threshold shifts change which signals fire; the spec's real boundary is cheap analytics vs expensive vectors. The script imports no vectors handle; `timestamps: false` for the same reason as the migration. Reports re-evaluated/tier-changed/skipped counts. Script name is my choice (the spec fixes only its five named commands); scope addition to Day 3 was approved at plan review — it shares `KeysetPager` with Scenario C and `PartialEvaluationService` with the PUT's D route, and Day 4 has no room for a spec-mandated artifact.
+
+**Verified (live):** 500 entries re-scored in 1.6s across five keyset batches with the newest `entry_vectors.updated` timestamp identical before and after the run — the collection-wide freeze witnessed, not asserted. Test-level: `migration.test.js` deep-equals the entire vector collection across a run.
+
+**Affects:** `server/src/scripts/reevaluateRisk.js`, `server/src/scripts/RiskReEvaluationService.js`, `server/src/repositories/EntryRepository.js` (`pageCompleteEntries`, `applyReEvaluatedAnalytics`), `package.json` + `server/package.json` (`reevaluate:risk`).
+
+---
+
+## [Day 3] Smaller calls, recorded so later phases don't relitigate them
+
+- **The PUT response shape is `{ routing, entry }`.** The Day 4 dashboard should read `routing.scenario` to decide UI behaviour (e.g. show "recomputing…" only for B/D) rather than re-deriving the classification client-side.
+- **Scenario E does bump the ledger `updated`** (a comment/workflow change is a genuine record update, unlike worker churn or model churn) and stamps `auditMeta.lastMetadataUpdate`; it touches no queue field and no analytics.
+- **A comment is append-only through PUT** (`$push`); there is no comment edit/delete surface — out of scope for the spec's audit-log scenario.
+- **Similarity results include `stale`** so the Day 4 diagnostics modal can badge pre-migration candidates instead of hiding them.
+- **`.env.example` needed no Day 3 additions** — batch size was already `MIGRATION_BATCH_SIZE`, and the scripts take `--batch-size`/`--dry-run` flags.
+
+**Affects:** `server/src/controllers/EntryController.js`, `server/src/services/UpdatePlanner.js`, `server/src/services/SimilaritySearchService.js`.
