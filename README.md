@@ -1,5 +1,8 @@
 # SmartAudit - Intelligent Financial Audit Pipeline
 
+**Live demo:** <https://smartaudit-b4qk.onrender.com>
+*(free-tier instance - the first load after idle can take up to a minute while it wakes; every load after that is instant)*
+
 An AI-enriched financial audit engine over a MongoDB journal ledger: entries are ingested through a REST API, enriched asynchronously by a background worker (risk scoring, granular anomaly detection, and three separate vector spaces), and explored through a React dashboard with a multi-vector diagnostics modal.
 
 Built to the SmartAudit assessment specification. The [architecture decisions](#architecture-decisions) section below sets out each significant choice, the alternatives weighed against it, and the reasoning - including the trade-offs knowingly accepted. Section references (e.g. "spec section 3.3") point into the assessment brief.
