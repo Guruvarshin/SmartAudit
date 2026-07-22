@@ -230,7 +230,7 @@ Base URL `http://localhost:4000`. The three paths marked **spec-fixed** are cont
 | `GET` | `/api/entries` | list, `?limit&tier&status` |
 | `GET` | `/api/entries/:id` | single entry |
 | `GET` | `/api/entries/:id/vectors` | the three vector spaces, for the diagnostics modal |
-| `GET` | `/health` | `{ ok: true }` |
+| `GET` | `/health` | readiness probe: `200 { ok: true, db: "connected" }`, or `503` when the database is unreachable |
 
 ### `POST /api/entries`
 

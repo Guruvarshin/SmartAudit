@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import express from 'express';
+import mongoose from 'mongoose';
 import { Config } from '../config/Config.js';
 import { EntryController } from '../controllers/EntryController.js';
 import { HttpError } from '../http/HttpError.js';
@@ -45,7 +46,17 @@ export class App {
     this.express.use(express.json({ limit: '256kb' }));
     this.express.use(this.#requestLog());
 
-    this.express.get('/health', (req, res) => res.json({ ok: true }));
+    // Liveness + readiness in one probe. mongoose.connection.readyState === 1
+    // means the driver holds a live connection; anything else means the app
+    // cannot serve data, so it reports 503 rather than lying with a 200. A
+    // load balancer or uptime monitor can then act on the real state.
+    this.express.get('/health', (req, res) => {
+      const connected = mongoose.connection.readyState === 1;
+      res.status(connected ? 200 : 503).json({
+        ok: connected,
+        db: connected ? 'connected' : 'unavailable'
+      });
+    });
     this.express.use('/api/entries', this.entryRouter.router);
     this.#mountClient();
 

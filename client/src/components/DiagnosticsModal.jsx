@@ -257,8 +257,8 @@ export class DiagnosticsModal extends React.Component {
                       <h6 className="border-bottom pb-1">
                         Multi-vector diagnostics{' '}
                         <span className="text-secondary small fw-normal">
- - stored in the separate entry_vectors collection; untouched by
-                          Scenario D updates
+                          - stored in the separate entry_vectors collection;
+                          untouched by Scenario D updates
                         </span>{' '}
                         <StaleBadge stale={this.state.vectors?.stale} />
                       </h6>
@@ -281,7 +281,7 @@ export class DiagnosticsModal extends React.Component {
                       <h6 className="border-bottom pb-1">
                         Edit ledger fields{' '}
                         <span className="text-secondary small fw-normal">
- - PUT /api/entries/:id, delta-routed
+                          - PUT /api/entries/:id, delta-routed
                         </span>
                       </h6>
                       <EditEntryForm
